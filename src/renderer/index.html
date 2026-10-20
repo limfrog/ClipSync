@@ -59,7 +59,8 @@
     <form id="settings-form">
       <label for="theme">화면 테마</label><select id="theme"><option value="dark">다크</option><option value="light">라이트</option><option value="system">시스템 설정</option></select>
       <label for="shortcut-setting">창 열기·숨기기 단축키</label><input id="shortcut-setting" type="text" placeholder="CommandOrControl+Shift+V" maxlength="80" autocomplete="off" spellcheck="false" /><p class="small-note">Ctrl/Command, Alt, Shift와 영문자·숫자를 조합하세요.</p>
-      <label class="checkbox-row"><input id="always-on-top" type="checkbox" /> 창 항상 위에 고정</label>
+      <label class="checkbox-row"><input id="start-on-login" type="checkbox" aria-describedby="startup-note" /> 부팅 시 시작</label>
+      <p id="startup-note" class="small-note">컴퓨터에 로그인하면 트레이·메뉴바에서 자동으로 시작합니다.</p>
       <section class="section-card"><h3>클립보드 기록</h3><p>앱을 켜둔 동안 최대 100개를 보관합니다. 이미지는 미리보기로, 파일은 원본 참조로 관리합니다. 종료하면 기록은 사라지며, 동기화한 파일은 다운로드 폴더의 ClipSync에 남습니다. 창을 숨겨도 동기화는 계속됩니다.</p></section>
       <button class="button primary full" type="submit">설정 저장</button>
     </form>

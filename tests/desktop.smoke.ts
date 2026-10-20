@@ -9,6 +9,7 @@ import { deriveGroup } from '../src/main/group-credentials';
 import { groupSession } from '../src/main/group-session';
 import { localDHT } from './p2p-helpers';
 import { until } from './helpers';
+import { assertReadable } from './contrast';
 
 test('clipboard manager searches, pins, recopies, saves preferences, hides and syncs its real OS clipboard', { timeout: 30000 }, async t => {
   const network = await localDHT();
@@ -46,7 +47,8 @@ test('clipboard manager searches, pins, recopies, saves preferences, hides and s
   assert.deepEqual(after, [before[0] + 25, before[1] + 20]);
   await page.getByRole('button', { name: '환경설정', exact: true }).click();
   await page.getByLabel('화면 테마').selectOption('dark');
-  await page.getByRole('checkbox', { name: '창 항상 위에 고정', exact: true }).check();
+  assert.equal(await page.getByRole('checkbox', { name: '창 항상 위에 고정', exact: true }).count(), 0);
+  assert.equal(await page.getByRole('checkbox', { name: '부팅 시 시작', exact: true }).isDisabled(), true, 'Development builds must not register Electron for startup');
   await page.getByRole('button', { name: '설정 저장' }).click();
   await until(async () => (await page.evaluate(() => window.clipSync.preferences())).alwaysOnTop);
   assert.equal(await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isAlwaysOnTop()), true);
@@ -67,11 +69,13 @@ test('clipboard manager searches, pins, recopies, saves preferences, hides and s
   await until(async () => (await page.evaluate(() => window.clipSync.state())).history.length === 1);
   await page.getByRole('tab', { name: '전체', exact: true }).click();
   await page.screenshot({ path: 'test-results/original-ui-dark.png' });
+  await assertReadable(page);
   await page.getByRole('button', { name: '환경설정', exact: true }).click();
   await page.getByLabel('화면 테마').selectOption('light');
   await page.getByRole('button', { name: '설정 저장' }).click();
   await until(async () => await page.evaluate(() => document.documentElement.dataset.theme) === 'light');
   await page.screenshot({ path: 'test-results/original-ui-light.png' });
+  await assertReadable(page);
   await page.getByRole('button', { name: '창 숨기기', exact: true }).click();
   assert.equal(await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible()), false);
   await desktop.evaluate(({ app }) => app.emit('activate'));

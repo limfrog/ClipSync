@@ -64,6 +64,22 @@ test('multiple copied files commit to the receiving clipboard as one complete ba
   assert.deepEqual(mediaB.current!.paths.map(p => path.basename(p)), ['첫 번째.exe','두 번째.zip']);
 });
 
+test('concurrent automatic offers reuse the first file and the newest batch still updates the clipboard', async t => {
+  const { a,b,mediaB,copied,root } = await pair(t);
+  const snapshot = await copied('동시에 복사.exe');
+  const peer = a.state().devices[0].id;
+  const revision = a.state().clipboardRevision;
+  const first = await a.sendFile(snapshot.paths[0], peer, false, false, { id: randomUUID(), index: 0, count: 1 }, revision);
+  const second = await a.sendFile(snapshot.paths[0], peer, false, false, { id: randomUUID(), index: 0, count: 1 }, revision);
+  await until(() => [first,second].every(id => a.state().transfers.find(t => t.id === id)?.status === 'completed'), 'Concurrent offers did not finish', 5000);
+  await until(() => mediaB.writes === 1);
+  assert.equal(a.state().transfers.find(t => t.id === second)?.bytes, 0);
+  assert.equal(b.state().transfers.find(t => t.id === second)?.reused, true);
+  assert.equal(b.completedFile(first).path, b.completedFile(second).path);
+  const { readdir } = await import('node:fs/promises');
+  assert.deepEqual(await readdir(path.join(root, 'B')), ['동시에 복사.exe']);
+});
+
 test('re-copying a received media history item synchronizes it back without a feedback loop', async t => {
   const { a,b,mediaA,mediaB,copied,syncB,textA } = await pair(t);
   mediaA.current = await copied('기록에서 다시 복사.exe');

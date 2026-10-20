@@ -1,6 +1,6 @@
 {
   "name": "clipsync",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "description": "복사 기록을 검색하고 재사용하며 텍스트·이미지·500MB 파일 클립보드를 기기 간 동기화하는 데스크톱 매니저",
   "private": true,
   "type": "module",
@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "test:desktop": "npm run build && node scripts/test-desktop.mjs",
+    "test:startup": "node scripts/test-desktop.mjs tests/desktop.startup.ts",
     "test:pair": "tsx --test tests/desktop.pair.ts",
     "test:large": "tsx --test tests/transfer.large.ts",
     "package": "npm run build && node scripts/package.mjs",

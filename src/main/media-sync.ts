@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
-import { mkdir, statfs } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { SyncState } from '../shared/api';
 import type { TransferState } from '../shared/transfers';
@@ -30,6 +30,7 @@ export class MediaSync {
   private lastSignature = '';
   private latestIncoming = '';
   private outgoing = Promise.resolve();
+  private incoming = Promise.resolve();
   private readonly accepted = new Set<string>();
   private readonly completed = new Set<string>();
   private readonly groups = new Map<string, Incoming>();
@@ -151,11 +152,21 @@ export class MediaSync {
   }
 
   private async accept(transfer: TransferState) {
-    await mkdir(this.receivedFolder, { recursive: true });
-    const space = await statfs(this.receivedFolder);
-    if (space.bavail * space.bsize < transfer.size + 500_000_000) throw new Error('클립보드 파일을 동기화할 저장 공간이 부족합니다.');
-    if (this.closed || this.controller.state().paused || this.controller.state().mode === 'idle') return;
-    await this.controller.acceptTransfer(transfer.id, path.join(this.receivedFolder, portableFilename(transfer.name)));
+    // Serialize automatic receives so simultaneous offers of the same file can
+    // reuse the first completed copy instead of both downloading its bytes.
+    const work = this.incoming.then(async () => {
+      if (this.closed || this.controller.state().paused || this.controller.state().mode === 'idle' ||
+        this.controller.state().transfers.find(t => t.id === transfer.id)?.status !== 'offered') return;
+      await mkdir(this.receivedFolder, { recursive: true });
+      await this.controller.acceptTransfer(transfer.id, path.join(this.receivedFolder, portableFilename(transfer.name)));
+      while (!this.closed) {
+        const current = this.controller.state().transfers.find(t => t.id === transfer.id);
+        if (!current || ['completed', 'cancelled', 'failed'].includes(current.status)) break;
+        await delay(50);
+      }
+    });
+    this.incoming = work.catch(() => {});
+    await work;
   }
 
   private async finish(group: Incoming) {
@@ -194,5 +205,5 @@ export class MediaSync {
     this.synchronize(snapshot);
   }
 
-  async dispose() { this.closed = true; clearInterval(this.timer); await Promise.all([this.outgoing, this.pendingPoll]); }
+  async dispose() { this.closed = true; clearInterval(this.timer); await Promise.all([this.outgoing, this.incoming, this.pendingPoll]); }
 }

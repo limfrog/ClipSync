@@ -64,6 +64,8 @@ Function un.onInit
 FunctionEnd
 
 Section "Uninstall"
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "ClipSync"
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run" "ClipSync"
   Delete "$DESKTOP\ClipSync.lnk"
   Delete "$SMPROGRAMS\ClipSync\ClipSync.lnk"
   Delete "$SMPROGRAMS\ClipSync\Uninstall ClipSync.lnk"

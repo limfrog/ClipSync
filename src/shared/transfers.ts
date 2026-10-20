@@ -4,8 +4,9 @@ export const CHUNK_BYTES = 256 * 1024;
 export interface Peer { id: string; name: string; transport?: 'lan' | 'p2p' }
 export interface ClipboardBatch { id: string; index: number; count: number }
 export type TransferPacket =
-  | { type: 'offer'; transferId: string; name: string; size: number; sha256: string; image: boolean; clipboard?: ClipboardBatch }
-  | { type: 'accept' | 'finish' | 'done'; transferId: string }
+  | { type: 'offer'; transferId: string; name: string; size: number; sha256: string; image: boolean; clipboard?: ClipboardBatch; reuse?: boolean }
+  | { type: 'accept'; transferId: string; have?: string }
+  | { type: 'finish' | 'done'; transferId: string }
   | { type: 'cancel'; transferId: string; reason: string }
   | { type: 'chunk'; transferId: string; offset: number; data: string }
   | { type: 'ack'; transferId: string; offset: number };
@@ -21,6 +22,7 @@ export interface TransferState {
   status: 'offered' | 'sending' | 'receiving' | 'completed' | 'cancelled' | 'failed';
   error: string | null;
   clipboard?: ClipboardBatch;
+  reused?: boolean;
 }
 
 export function isTransferPacket(value: unknown): value is TransferPacket {
@@ -29,10 +31,12 @@ export function isTransferPacket(value: unknown): value is TransferPacket {
   if (typeof p.transferId !== 'string' || !/^[0-9a-f-]{36}$/.test(p.transferId)) return false;
   switch (p.type) {
     case 'offer': return typeof p.name === 'string' && p.name.length > 0 && p.name.length <= 1024 &&
+      (p.reuse === undefined || typeof p.reuse === 'boolean') &&
       (p.clipboard === undefined || validBatch(p.clipboard)) &&
       Number.isSafeInteger(p.size) && Number(p.size) >= 0 && Number(p.size) <= MAX_FILE_BYTES &&
       typeof p.sha256 === 'string' && /^[0-9a-f]{64}$/.test(p.sha256) && typeof p.image === 'boolean';
-    case 'accept': case 'finish': case 'done': return true;
+    case 'accept': return p.have === undefined || typeof p.have === 'string' && /^[0-9a-f]{64}$/.test(p.have);
+    case 'finish': case 'done': return true;
     case 'cancel': return typeof p.reason === 'string' && p.reason.length <= 240;
     case 'ack': return Number.isSafeInteger(p.offset) && Number(p.offset) >= 0 && Number(p.offset) <= MAX_FILE_BYTES;
     case 'chunk': return Number.isSafeInteger(p.offset) && Number(p.offset) >= 0 && Number(p.offset) <= MAX_FILE_BYTES &&

@@ -30,6 +30,26 @@ jobs:
       - name: Verify Windows native titlebar regions and connection restore
         if: runner.os == 'Windows'
         run: node scripts/test-desktop.mjs tests/desktop.persistence.ts
+      - name: Package Windows app for native startup verification
+        if: runner.os == 'Windows'
+        run: npx electron-builder --config electron-builder.config.cjs --win --x64 --dir --publish never
+      - name: Verify Windows startup registration and hidden launch
+        if: runner.os == 'Windows'
+        run: |
+          $env:CLIPSYNC_EXECUTABLE = (Resolve-Path 'release/installers/win-unpacked/ClipSync.exe').Path
+          bash scripts/check-ci.sh test:startup
+      - name: Package installed Intel Mac app for native startup verification
+        if: matrix.os == 'macos-26-intel'
+        run: |
+          npx electron-builder --config electron-builder.config.cjs --mac --x64 --dir --publish never
+          sudo ditto release/installers/mac/ClipSync.app /Applications/ClipSync.app
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Verify Mac startup registration and hidden launch
+        if: matrix.os == 'macos-26-intel'
+        run: bash scripts/check-ci.sh test:startup
+        env:
+          CLIPSYNC_EXECUTABLE: /Applications/ClipSync.app/Contents/MacOS/ClipSync
       - run: sudo apt-get update && sudo apt-get install -y xvfb gnome-keyring dbus-x11 openbox xdotool
         if: runner.os == 'Linux'
       - run: bash scripts/check-ci.sh test:desktop

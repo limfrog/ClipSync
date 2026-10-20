@@ -13,6 +13,7 @@ import { MediaSync } from './media-sync';
 import { ConnectionStore } from './connection-store';
 import { createGroupKey, deriveGroup } from './group-credentials';
 import type { GroupCredentials, GroupInput } from '../shared/group';
+import { LoginStartup } from './login-startup';
 
 let window: BrowserWindow | null = null;
 let controller: SyncController;
@@ -30,20 +31,23 @@ let savedGroup: GroupCredentials | null = null;
 let remembered = false;
 let position: { x: number; y: number } | undefined;
 let positionTimer: ReturnType<typeof setTimeout> | undefined;
+const startup = new LoginStartup(app);
+let startedAtLogin = false;
 const imageCachePath = async () => imageCache ??= await mkdtemp(path.join(app.getPath('temp'), 'clipsync-images-'));
 
 function validatePreferences(value: unknown): Preferences {
   if (!value || typeof value !== 'object') throw new Error('설정을 확인해 주세요.');
   const p = value as Preferences;
   if (!['system', 'dark', 'light'].includes(p.theme) || typeof p.alwaysOnTop !== 'boolean' ||
+      (p.startOnLogin !== undefined && typeof p.startOnLogin !== 'boolean') ||
       typeof p.shortcut !== 'string' || p.shortcut.length > 80 || !/^(?=.*(?:Control|Ctrl|Command|Cmd|Alt|Option)).+\+[A-Z0-9]$/i.test(p.shortcut)) {
     throw new Error('테마와 단축키 설정을 확인해 주세요.');
   }
-  return { theme: p.theme, alwaysOnTop: p.alwaysOnTop, shortcut: p.shortcut };
+  return { theme: p.theme, alwaysOnTop: p.alwaysOnTop, startOnLogin: p.startOnLogin ?? false, shortcut: p.shortcut };
 }
 
 const preferencesPath = () => path.join(app.getPath('userData'), 'preferences.json');
-const currentPreferences = () => ({ ...preferences, shortcutAvailable: globalShortcut.isRegistered(preferences.shortcut) });
+const currentPreferences = () => ({ ...preferences, ...startup.info(), shortcutAvailable: globalShortcut.isRegistered(preferences.shortcut) });
 
 function toggleWindow() {
   if (!window || window.isDestroyed()) createWindow();
@@ -102,11 +106,17 @@ async function configure(value: unknown) {
   const next = validatePreferences(value);
   const newShortcut = next.shortcut !== preferences.shortcut || !globalShortcut.isRegistered(next.shortcut);
   if (newShortcut && !globalShortcut.register(next.shortcut, toggleWindow)) throw new Error('다른 앱이 사용 중인 단축키입니다. 다른 조합을 선택해 주세요.');
+  const previousStartup = startup.info().startOnLogin;
+  const changeStartup = next.startOnLogin !== previousStartup;
   try {
+    if (changeStartup) startup.set(next.startOnLogin);
     await mkdir(app.getPath('userData'), { recursive: true });
     await writeFile(`${preferencesPath()}.tmp`, JSON.stringify(next), { mode: 0o600 });
     await rename(`${preferencesPath()}.tmp`, preferencesPath());
-  } catch (error) { if (newShortcut) globalShortcut.unregister(next.shortcut); throw error; }
+  } catch (error) {
+    if (changeStartup) try { startup.set(previousStartup); } catch { /* The OS status is queried again when settings opens. */ }
+    if (newShortcut) globalShortcut.unregister(next.shortcut); throw error;
+  }
   if (next.shortcut !== preferences.shortcut) globalShortcut.unregister(preferences.shortcut);
   preferences = next;
   window?.setAlwaysOnTop(next.alwaysOnTop);
@@ -120,6 +130,12 @@ async function nativeDialog<T>(action: () => Promise<T>) {
 
 // Tests isolate app data; normal desktops use Electron's standard per-user path.
 if (process.env.CLIPSYNC_DATA_DIR) app.setPath('userData', process.env.CLIPSYNC_DATA_DIR);
+const primaryInstance = app.requestSingleInstanceLock();
+if (!primaryInstance) app.quit();
+app.on('second-instance', (_event, commandLine) => {
+  if (commandLine.includes('--startup')) return;
+  if (!window) createWindow(); window?.show(); window?.focus();
+});
 
 function createWindow() {
   lastHistorySent = -1;
@@ -128,6 +144,7 @@ function createWindow() {
     minWidth: 380, minHeight: 500, frame: false, movable: true, resizable: false, fullscreenable: false,
     ...(position ?? {}),
     alwaysOnTop: preferences.alwaysOnTop, skipTaskbar: Boolean(tray),
+    show: !startedAtLogin || !tray,
     title: 'ClipSync', backgroundColor: '#09090b', icon: path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -155,7 +172,8 @@ function createWindow() {
   window.on('closed', () => { window = null; });
 }
 
-void app.whenReady().then(async () => {
+if (primaryInstance) void app.whenReady().then(async () => {
+  startedAtLogin = startup.startedAtLogin();
   try { preferences = validatePreferences(JSON.parse(await readFile(preferencesPath(), 'utf8'))); }
   catch { preferences = { ...DEFAULT_PREFERENCES }; }
   try {
@@ -262,6 +280,7 @@ void app.whenReady().then(async () => {
   createTray();
   globalShortcut.register(preferences.shortcut, toggleWindow);
   createWindow();
+  if (startedAtLogin && tray && process.platform === 'darwin') app.dock?.hide();
   try {
     const saved = await connectionStore.load();
     if (saved) { savedGroup = saved; remembered = true; await controller.connectGroup(saved, p2pOptions()); }

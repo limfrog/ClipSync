@@ -94,9 +94,9 @@ function transferCard(transfer: TransferState) {
   const name = document.createElement('strong'); name.textContent = `${transfer.image ? '▧' : '↗'}  ${transfer.name}`;
   const detail = document.createElement('p');
   const labels = { offered: transfer.direction === 'receive' ? '수신 대기' : '상대 PC의 수락 대기', sending: '보내는 중', receiving: '받는 중', completed: '전송 완료', cancelled: '취소됨', failed: '전송 실패' };
-  detail.textContent = `${transfer.clipboard ? '클립보드 동기화' : transfer.direction === 'send' ? '보내기' : '받기'} · ${labels[transfer.status]} · ${size(transfer.bytes)} / ${size(transfer.size)}${transfer.error ? ` · ${transfer.error}` : ''}`;
+  detail.textContent = `${transfer.clipboard ? '클립보드 동기화' : transfer.direction === 'send' ? '보내기' : '받기'} · ${transfer.reused ? '기존 파일 사용' : labels[transfer.status]} · ${transfer.reused ? size(transfer.size) : `${size(transfer.bytes)} / ${size(transfer.size)}`}${transfer.error ? ` · ${transfer.error}` : ''}`;
   info.append(name, detail); row.append(info);
-  if (transfer.status === 'sending' || transfer.status === 'receiving') {
+  if (!transfer.reused && (transfer.status === 'sending' || transfer.status === 'receiving')) {
     const progress = document.createElement('progress'); progress.max = transfer.size || 1; progress.value = transfer.bytes; progress.setAttribute('aria-label', `${transfer.name} 전송 진행률`); info.append(progress);
   }
   const actions = document.createElement('div'); actions.className = 'transfer-actions';
@@ -145,15 +145,19 @@ function renderHistory() {
   }
 }
 
-for (const id of ['open-connection', 'open-settings']) element(id).addEventListener('click', () => {
+for (const id of ['open-connection', 'open-settings']) element(id).addEventListener('click', async () => {
   if (id === 'open-connection') {
     connection.showModal();
     void window.clipSync.connection().then(updateConnection).catch(() => showError('연결 정보를 읽을 수 없습니다.'));
   }
   else {
+    try { updatePreferences(await window.clipSync.preferences()); } catch { showError('설정을 읽을 수 없습니다.'); return; }
     element<HTMLSelectElement>('theme').value = preferences.theme;
     element<HTMLInputElement>('shortcut-setting').value = preferences.shortcut;
-    element<HTMLInputElement>('always-on-top').checked = preferences.alwaysOnTop;
+    const startup = element<HTMLInputElement>('start-on-login');
+    startup.checked = preferences.startOnLogin;
+    startup.disabled = preferences.startupStatus === 'unsupported';
+    element('startup-note').textContent = preferences.startupStatus === 'requires-approval' ? '시스템 설정 > 일반 > 로그인 항목에서 ClipSync를 허용해 주세요.' : preferences.startupStatus === 'blocked' ? 'Windows 설정 > 앱 > 시작 프로그램에서 ClipSync를 허용해 주세요.' : preferences.startupStatus === 'unsupported' ? '부팅 시 시작은 설치된 Windows·Mac 앱에서 사용할 수 있습니다.' : '컴퓨터에 로그인하면 트레이·메뉴바에서 자동으로 시작합니다.';
     settings.showModal();
   }
 });
@@ -189,7 +193,7 @@ element('disconnect').addEventListener('click', () => { void act(async () => { c
 element('settings-form').addEventListener('submit', event => {
   event.preventDefault();
   void act(async () => {
-    const result = await window.clipSync.configure({ theme: element<HTMLSelectElement>('theme').value as Preferences['theme'], shortcut: element<HTMLInputElement>('shortcut-setting').value.trim(), alwaysOnTop: element<HTMLInputElement>('always-on-top').checked });
+    const result = await window.clipSync.configure({ ...preferences, theme: element<HTMLSelectElement>('theme').value as Preferences['theme'], shortcut: element<HTMLInputElement>('shortcut-setting').value.trim(), startOnLogin: element<HTMLInputElement>('start-on-login').checked });
     if (result.ok) settings.close(); return result;
   }, '설정을 저장했어요.');
 });

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
-import { mkdir, open, stat, writeFile } from 'node:fs/promises';
+import { mkdir, open, readdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { test } from 'node:test';
 import { MAX_FILE_BYTES } from '../src/shared/transfers';
@@ -9,7 +9,8 @@ import { until } from './helpers';
 import { complete, transferPair } from './transfer-helpers';
 
 test('a full 500MB program transfers over encrypted sockets with bounded memory and an intact Korean filename', { timeout: 180000 }, async t => {
-  const { root, client, sending, receiving } = await transferPair(t);
+  let chunks = 0;
+  const { root, client, sending, receiving } = await transferPair(t, packet => { if (packet.type === 'chunk') chunks++; return packet; });
   const file = path.join(root, '한글 대용량 프로그램.exe'.normalize('NFD'));
   const handle = await open(file, 'wx');
   await handle.truncate(MAX_FILE_BYTES);
@@ -33,11 +34,25 @@ test('a full 500MB program transfers over encrypted sockets with bounded memory 
   assert.equal(path.basename(saved), '한글 대용량 프로그램.exe');
   const [sourceHash, savedHash] = await Promise.all([fileDigest(file), fileDigest(saved)]);
   assert.equal(sourceHash, savedHash);
+  const firstTransferMs = Date.now() - started;
+  const firstChunks = chunks;
+  const reusedAt = Date.now();
+  const again = await sending.offer(file, client.id);
+  await until(() => receiving.states().some(t => t.id === again));
+  await receiving.accept(again, path.join(folder, '한글 대용량 프로그램.exe'));
+  await complete(sending, receiving, again, 170000);
+  assert.equal(chunks, firstChunks, 'A duplicate 500MB file must not send any data chunks');
+  assert.equal(receiving.completedFile(again).path, saved);
+  assert.equal(sending.states().find(t => t.id === again)?.bytes, 0);
+  assert.equal(receiving.states().find(t => t.id === again)?.bytes, 0);
+  assert.deepEqual(await readdir(folder), ['한글 대용량 프로그램.exe']);
+  const duplicateReuseMs = Date.now() - reusedAt;
   assert.ok(peakRss - baselineRss < 256 * 1024 * 1024, 'Transfer buffered too much of the file in memory');
   await mkdir('test-results', { recursive: true });
   await writeFile('test-results/large-transfer.json', JSON.stringify({
     completedAt: new Date().toISOString(), bytes: MAX_FILE_BYTES, sha256: savedHash,
     filename: path.basename(saved), durationMs: Date.now() - started,
     baselineRss, peakRss, rssGrowth: peakRss - baselineRss, outcome: 'passed',
+    firstTransferMs, duplicateReuseMs, duplicateDataChunks: chunks - firstChunks, duplicateSavedCopies: 0,
   }, null, 2) + '\n');
 });

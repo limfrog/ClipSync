@@ -1,9 +1,10 @@
 import { createHash, randomUUID, type Hash } from 'node:crypto';
 import { constants, createReadStream } from 'node:fs';
-import { copyFile, link, open, stat as fileStat, unlink, type FileHandle } from 'node:fs/promises';
+import { copyFile, link, open, stat as fileStat, statfs, unlink, type FileHandle } from 'node:fs/promises';
 import path from 'node:path';
 import { CHUNK_BYTES, MAX_FILE_BYTES, type ClipboardBatch, type TransferPacket, type TransferState } from '../shared/transfers';
 import { numberedFilename, portableFilename } from './file-names';
+import { findReceivedFile, stillReceivedFile, type VerifiedFile } from './received-files';
 
 interface Entry {
   state: TransferState;
@@ -17,6 +18,8 @@ interface Entry {
   hash?: Hash;
   expectedAck?: number;
   finishing?: boolean;
+  canReuse?: boolean;
+  existing?: VerifiedFile;
   lastAt: number;
 }
 
@@ -86,7 +89,7 @@ export class TransferManager {
       this.entries.set(entry.state.id, entry);
       retained = true;
       try {
-        this.send({ type: 'offer', transferId: entry.state.id, name: entry.state.name, size: stat.size, sha256: entry.sha256, image, ...(clipboard ? { clipboard } : {}) }, peerId);
+        this.send({ type: 'offer', transferId: entry.state.id, name: entry.state.name, size: stat.size, sha256: entry.sha256, image, reuse: true, ...(clipboard ? { clipboard } : {}) }, peerId);
       } catch (error) { await this.fail(entry, error); throw error; }
       this.emit();
       return entry.state.id;
@@ -105,16 +108,27 @@ export class TransferManager {
     const entry = this.entries.get(id);
     if (!entry || entry.state.direction !== 'receive' || entry.state.status !== 'offered' || this.closed) throw new Error('수신 대기 중인 파일이 아닙니다.');
     if ([...this.entries.values()].filter(e => e.state.status === 'receiving').length >= 2) throw new Error('한 번에 파일 2개까지 받을 수 있습니다.');
-    entry.state.status = 'receiving';
     try {
       entry.target = path.join(path.dirname(destination), portableFilename(path.basename(destination)));
-      entry.part = path.join(path.dirname(entry.target), `.clipsync-${entry.state.id}.part`);
-      entry.handle = await open(entry.part, 'wx', 0o600);
-      entry.hash = createHash('sha256');
+      if (entry.canReuse) entry.existing = await findReceivedFile(entry.target, entry.state.size, entry.sha256, () => this.closed);
+      if (this.closed) return;
+      if (entry.existing) entry.state.reused = true;
+      else await this.prepareDownload(entry);
+      entry.state.status = 'receiving';
       entry.lastAt = Date.now();
-      this.send({ type: 'accept', transferId: id }, entry.state.peerId);
+      this.send({ type: 'accept', transferId: id, ...(entry.existing ? { have: entry.sha256 } : {}) }, entry.state.peerId);
       this.emit();
     } catch (error) { await this.fail(entry, error); throw error; }
+  }
+
+  private async prepareDownload(entry: Entry) {
+    if (entry.state.clipboard) {
+      const space = await statfs(path.dirname(entry.target!));
+      if (space.bavail * space.bsize < entry.state.size + 500_000_000) throw new Error('클립보드 파일을 동기화할 저장 공간이 부족합니다.');
+    }
+    entry.part = path.join(path.dirname(entry.target!), `.clipsync-${entry.state.id}.part`);
+    entry.handle = await open(entry.part, 'wx', 0o600);
+    entry.hash = createHash('sha256');
   }
 
   receive(packet: TransferPacket, from: string) {
@@ -129,7 +143,7 @@ export class TransferManager {
         }
         this.entries.set(packet.transferId, {
           state: { id: packet.transferId, direction: 'receive', peerId: from, name: portableFilename(packet.name), size: packet.size, bytes: 0, image: packet.image, status: 'offered', error: null, ...(packet.clipboard ? { clipboard: packet.clipboard } : {}) },
-          sha256: packet.sha256, lastAt: Date.now(),
+          sha256: packet.sha256, canReuse: packet.reuse === true, lastAt: Date.now(),
         });
         this.emit();
         return;
@@ -143,14 +157,23 @@ export class TransferManager {
           entry.state.error = packet.reason;
           await this.cleanup(entry);
           this.emit();
-        } else if (packet.type === 'accept' && entry.state.direction === 'send' && entry.state.status === 'offered') {
+        } else if (packet.type === 'accept' && entry.state.direction === 'send' &&
+          (entry.state.status === 'offered' || entry.state.reused && entry.finishing && packet.have === undefined)) {
           entry.state.status = 'sending';
-          await this.next(entry);
+          if (packet.have !== undefined) {
+            if (packet.have !== entry.sha256) throw new Error('기존 파일 확인값이 일치하지 않습니다.');
+            entry.state.reused = true; entry.finishing = true;
+            this.send({ type: 'finish', transferId: entry.state.id }, from); this.emit();
+          } else {
+            delete entry.state.reused; entry.finishing = false;
+            await this.next(entry);
+          }
         } else if (packet.type === 'ack' && entry.state.direction === 'send' && entry.state.status === 'sending') {
           if (packet.offset !== entry.expectedAck || packet.offset <= entry.state.bytes) throw new Error('파일 전송 순서가 올바르지 않습니다.');
           entry.state.bytes = packet.offset;
           await this.next(entry);
         } else if (packet.type === 'chunk' && entry.state.direction === 'receive' && entry.state.status === 'receiving') {
+          if (entry.existing) throw new Error('기존 파일 재사용 중 예상하지 못한 데이터입니다.');
           const data = Buffer.from(packet.data, 'base64');
           if (!data.length || data.length > CHUNK_BYTES || data.toString('base64') !== packet.data || packet.offset !== entry.state.bytes || data.length > entry.state.size - entry.state.bytes) throw new Error('파일 조각이 올바르지 않습니다.');
           let written = 0;
@@ -164,12 +187,22 @@ export class TransferManager {
           this.send({ type: 'ack', transferId: entry.state.id, offset: entry.state.bytes }, from);
           this.emit(false);
         } else if (packet.type === 'finish' && entry.state.direction === 'receive' && entry.state.status === 'receiving') {
-          if (entry.state.bytes !== entry.state.size || entry.hash!.digest('hex') !== entry.sha256) throw new Error('원본과 일치하지 않아 파일을 저장하지 않았습니다. 다시 보내 주세요.');
-          await entry.handle!.sync();
-          await entry.handle!.close();
-          entry.handle = undefined;
-          entry.saved = await this.publish(entry);
-          entry.part = undefined;
+          if (entry.existing) {
+            if (!await stillReceivedFile(entry.existing)) {
+              // A candidate changed after comparison. Request the normal stream.
+              entry.existing = undefined; delete entry.state.reused;
+              await this.prepareDownload(entry);
+              this.send({ type: 'accept', transferId: entry.state.id }, from); this.emit(); return;
+            }
+            entry.saved = entry.existing.path;
+          } else {
+            if (entry.state.bytes !== entry.state.size || entry.hash!.digest('hex') !== entry.sha256) throw new Error('원본과 일치하지 않아 파일을 저장하지 않았습니다. 다시 보내 주세요.');
+            await entry.handle!.sync();
+            await entry.handle!.close();
+            entry.handle = undefined;
+            entry.saved = await this.publish(entry);
+            entry.part = undefined;
+          }
           entry.state.name = path.basename(entry.saved);
           entry.state.status = 'completed';
           // A lost final acknowledgement must not invalidate an already verified file.
@@ -199,6 +232,13 @@ export class TransferManager {
   }
 
   private async publish(entry: Entry) {
+    // Legacy senders and concurrent manual receives can still reuse the saved
+    // file after receiving data, preserving the original without another copy.
+    const existing = await findReceivedFile(entry.target!, entry.state.size, entry.sha256, () => this.closed);
+    if (existing && await stillReceivedFile(existing)) {
+      await unlink(entry.part!); entry.state.reused = true;
+      return existing.path;
+    }
     const base = path.basename(entry.target!);
     for (let number = 0; number < 10000; number++) {
       const target = path.join(path.dirname(entry.target!), number ? numberedFilename(base, number) : base);
