@@ -137,7 +137,8 @@ test('two packaged desktops with independent OS clipboards', { timeout: 600000 }
     const page = await app.firstWindow();
     page.on('pageerror', error => rendererErrors.push(error.message));
     await page.getByRole('heading', { name: 'ClipSync', exact: true }).waitFor();
-    await page.getByRole('button', { name: '창 항상 위에 고정', exact: true }).click();
+    await page.evaluate(async () => { const p = await window.clipSync.preferences(); await window.clipSync.configure({ ...p, alwaysOnTop: true }); });
+    await app.evaluate(({ app }) => app.emit('activate'));
     const desktop = { app, page, display: display.display, profile };
     return desktop;
   }

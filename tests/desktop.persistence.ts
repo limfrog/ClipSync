@@ -37,10 +37,12 @@ test('native dragging, secure connection restore, hide keeps syncing, quit exits
     const page = await app.firstWindow(); await page.getByRole('heading', { name: 'ClipSync', exact: true }).waitFor();
     const storage = await app.evaluate(({ safeStorage, app }) => ({ available: safeStorage.isEncryptionAvailable(), backend: process.platform === 'linux' ? safeStorage.getSelectedStorageBackend() : 'native', requested: app.commandLine.getSwitchValue('password-store') }));
     assert.equal(storage.available, true, `Native secret store: ${JSON.stringify(storage)}`); assert.notEqual(storage.backend, 'basic_text');
+    await page.evaluate(async () => { const p = await window.clipSync.preferences(); await window.clipSync.configure({ ...p, alwaysOnTop: true }); });
+    // Window-manager/keyring startup can blur and hide the tray window before the first click.
+    await app.evaluate(({ app }) => app.emit('activate'));
     return { app, page };
   }
   const first = await launch();
-  await first.page.evaluate(async () => { const p = await window.clipSync.preferences(); await window.clipSync.configure({ ...p, alwaysOnTop: true }); });
   await first.page.getByRole('button', { name: '기기 연결', exact: true }).click();
   await first.page.getByRole('button', { name: '새 키 만들기' }).click();
   const groupKey = await first.page.getByLabel('연결 키 · 영문·숫자 20자리').inputValue();

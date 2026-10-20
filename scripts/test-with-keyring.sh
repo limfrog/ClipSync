@@ -6,7 +6,7 @@ export XDG_DATA_HOME="$test_root/data"
 export XDG_RUNTIME_DIR="$test_root/runtime"
 export XDG_CONFIG_HOME="$test_root/config"
 mkdir -p "$XDG_DATA_HOME" "$XDG_RUNTIME_DIR" "$XDG_CONFIG_HOME" "$test_root/control"
-chmod 700 "$XDG_RUNTIME_DIR"
+chmod 700 "$XDG_RUNTIME_DIR" "$XDG_DATA_HOME" "$XDG_CONFIG_HOME" "$test_root/control"
 export XDG_CURRENT_DESKTOP=GNOME
 keyring_daemon="${CLIPSYNC_KEYRING_DAEMON:-gnome-keyring-daemon}"
 printf '%s' 'ephemeral-test-keyring-password' | "$keyring_daemon" --foreground --unlock --components=secrets --control-directory "$test_root/control" &

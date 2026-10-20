@@ -25,6 +25,8 @@ test('clipboard manager searches, pins, recopies, saves preferences, hides and s
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.getByRole('heading', { name: 'ClipSync', exact: true }).waitFor();
+  await page.evaluate(async () => { const p = await window.clipSync.preferences(); await window.clipSync.configure({ ...p, alwaysOnTop: true }); });
+  await desktop.evaluate(({ app }) => app.emit('activate'));
   assert.equal(await page.evaluate(() => typeof (window as unknown as { require?: unknown }).require), 'undefined');
   assert.equal(await page.evaluate(() => typeof (window as unknown as { process?: unknown }).process), 'undefined');
 
