@@ -24,31 +24,23 @@ jobs:
       - run: node node_modules/electron/install.js
       - name: Tests
         shell: bash
-        run: |
-          set +e
-          npm test 2>&1 | tee "$RUNNER_TEMP/clipsync-tests.log"
-          result=${PIPESTATUS[0]}
-          set -e
-          if [[ "$result" != 0 ]]; then
-            node --input-type=module -e 'import fs from "node:fs"; import path from "node:path"; const lines = fs.readFileSync(path.join(process.env.RUNNER_TEMP, "clipsync-tests.log"), "utf8").split(/\r?\n/).slice(-85).join("\n"); console.log("::error::" + lines.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A"));'
-            exit "$result"
-          fi
+        run: bash scripts/check-ci.sh test
       - run: npm run build
       - run: sudo apt-get update && sudo apt-get install -y xvfb gnome-keyring dbus-x11 openbox xdotool
         if: runner.os == 'Linux'
-      - run: npm run test:desktop
+      - run: bash scripts/check-ci.sh test:desktop
         if: runner.os == 'Linux'
         env:
           CLIPSYNC_TEST_NO_SANDBOX: '1'
-      - run: npm run test:persistence
+      - run: bash scripts/check-ci.sh test:persistence
         if: runner.os == 'Linux'
         env:
           CLIPSYNC_TEST_NO_SANDBOX: '1'
       - run: npm run package
         if: runner.os == 'Linux'
-      - run: npm run test:pair
+      - run: bash scripts/check-ci.sh test:pair
         if: runner.os == 'Linux'
         env:
           CLIPSYNC_TEST_NO_SANDBOX: '1'
-      - run: npm run test:large
+      - run: bash scripts/check-ci.sh test:large
         if: runner.os == 'Linux'
