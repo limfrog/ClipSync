@@ -33,6 +33,7 @@ test('LAN connects without internet discovery, rejects wrong password, reconnect
   assert.equal(peers[3], 0);
   assert.equal(a.diagnostics().routingNodes, 0);
   assert.equal(a.diagnostics().lanPeers, 2);
+  await until(() => a.diagnostics().lan!.rejectedBeacons > 0, 'Matching-topic invalid proofs must be counted without authenticating');
   a.publish('인터넷 없이 한글 클립보드 연결');
   await until(() => texts[1].length === 1 && texts[2].length === 1);
   assert.equal(texts[1][0], '인터넷 없이 한글 클립보드 연결'); assert.deepEqual(texts[3], []);
@@ -49,4 +50,32 @@ test('LAN connects without internet discovery, rejects wrong password, reconnect
   assert.deepEqual(peers, [2, 2, 2, 0]);
   b.publish('연결 유지'); await until(() => texts[2].includes('연결 유지'));
   for (const session of sessions) assert.equal(session.diagnostics().relayAttempts, 0);
+});
+
+test('broadcast-only discovery connects authenticated peers when multicast and DHT are unavailable, and reports foreign groups', { timeout: 20000 }, async t => {
+  const input = { groupKey: createGroupKey(), password: 'broadcast-password-1234' };
+  const credentials = await Promise.all([deriveGroup(input), deriveGroup(input), deriveGroup({ ...input, password: 'another-password' })]);
+  const sessions: P2PSession[] = [];
+  t.after(async () => { for (const session of sessions) await session.close(); });
+  const peers = [0, 0, 0]; const texts: string[][] = [[], [], []];
+  const events: string[] = [];
+  t.after(() => t.diagnostic(events.join('; ')));
+  for (let index = 0; index < 3; index++) {
+    sessions.push(groupSession(credentials[index], {
+      onText: text => texts[index].push(text), onPeers: count => { peers[index] = count; },
+      onDevices: () => {}, onTransfer: () => {}, onStatus: () => {},
+    }, { bootstrap: [], lanDiscovery: { multicast: false }, lanDiagnostic: event => { if (events.length < 60) events.push(`${index}: ${event}`); } }));
+  }
+  await until(() => peers[0] === 1 && peers[1] === 1, 'Broadcast did not connect without multicast or DHT', 7000);
+  assert.equal(peers[2], 0);
+  for (const session of sessions.slice(0, 2)) {
+    const diagnostics = session.diagnostics();
+    assert.equal(diagnostics.routingNodes, 0); assert.equal(diagnostics.lanPeers, 1);
+    assert.ok(diagnostics.lan!.announcementsSent > 0); assert.ok(diagnostics.lan!.receivedPackets > 0);
+    assert.ok(diagnostics.lan!.broadcastTargets > 0);
+  }
+  await until(() => sessions[0].diagnostics().lan!.otherGroupBeacons > 0, 'Different credentials must be distinguished from absent packets');
+  sessions[0].publish('멀티캐스트 없이 한글 연결');
+  await until(() => texts[1].includes('멀티캐스트 없이 한글 연결'));
+  assert.deepEqual(texts[2], []);
 });

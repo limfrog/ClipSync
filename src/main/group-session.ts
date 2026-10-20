@@ -3,7 +3,7 @@ import { hostname } from 'node:os';
 import type { Duplex } from 'node:stream';
 import { discoverLAN } from './lan-discovery';
 import Hyperswarm, { type PeerSocket } from 'hyperswarm';
-import type { GroupCredentials, GroupStatus } from '../shared/group';
+import type { GroupCredentials, GroupStatus, LANDiagnostics } from '../shared/group';
 import { MAX_P2P_FRAME } from '../shared/group';
 import type { Peer, TransferPacket } from '../shared/transfers';
 import { open, proof, RecentMessages, sealGroupText, sealTransfer, verifyProof } from './protocol';
@@ -17,8 +17,8 @@ interface Callbacks {
   onStatus(status: GroupStatus, error?: string): void;
 }
 interface Member { socket: Duplex; id: string; name: string; rank: string; lastSeen: number }
-export interface P2POptions { bootstrap?: string[]; lan?: boolean; lanDiagnostic?(event: string): void; onHints?(hints: { peers: string[]; nodes: { host: string; port: number }[] }): void }
-export interface P2PSession extends Session { diagnostics(): { peers: number; relayAttempts: number; lanPeers: number; routingNodes: number; lan?: { udpReady: boolean; tcpReady: boolean; interfaces: number; beacons: number; lastError: string | null } } }
+export interface P2POptions { bootstrap?: string[]; lan?: boolean; lanDiscovery?: { multicast?: boolean; broadcast?: boolean }; lanDiagnostic?(event: string): void; onHints?(hints: { peers: string[]; nodes: { host: string; port: number }[] }): void }
+export interface P2PSession extends Session { diagnostics(): { peers: number; relayAttempts: number; lanPeers: number; routingNodes: number; lan?: LANDiagnostics } }
 
 /** LAN multicast/TCP and WAN DHT/Noise race in parallel; payloads are always authenticated and encrypted. */
 export function groupSession(credentials: GroupCredentials, callbacks: Callbacks, options: P2POptions = {}): P2PSession {
@@ -131,7 +131,7 @@ export function groupSession(credentials: GroupCredentials, callbacks: Callbacks
     });
   }
   swarm.on('connection', (socket: PeerSocket) => attach(socket, socket));
-  const lan = options.lan === false ? undefined : discoverLAN(credentials, socket => attach(socket), options.lanDiagnostic);
+  const lan = options.lan === false ? undefined : discoverLAN(credentials, socket => attach(socket), options.lanDiagnostic, options.lanDiscovery);
   swarm.on('error', () => { if (!closed && !members.size) callbacks.onStatus('reconnecting', 'P2P 탐색을 다시 시도하고 있습니다. 네트워크와 방화벽을 확인해 주세요.'); });
   const discovery = swarm.join(Buffer.from(credentials.room, 'base64url'), { server: true, client: true });
   void discovery.flushed().then(async () => { update(); if (!closed) await discovery.refresh(); }).catch(() => {
@@ -150,7 +150,9 @@ export function groupSession(credentials: GroupCredentials, callbacks: Callbacks
     if (refreshCount % 6 === 0 && known.size) options.onHints?.({ peers: [...known], nodes: swarm.dht.toArray({ limit: 16 }) });
   }, 5000); refresh.unref();
   const discoverWarning = setTimeout(() => {
-    if (!closed && !members.size) callbacks.onStatus(hadPeers ? 'reconnecting' : 'discovering', swarm.dht.toArray({ limit: 1 }).length
+    if (!closed && !members.size) callbacks.onStatus(hadPeers ? 'reconnecting' : 'discovering', (lan?.diagnostics().otherGroupBeacons ?? 0) > 0
+      ? '다른 연결 정보의 ClipSync 발견 신호를 받았습니다. 연결할 PC의 키·비밀번호가 모두 같은지 확인해 주세요.'
+      : swarm.dht.toArray({ limit: 1 }).length
       ? '같은 키·비밀번호와 방화벽의 ClipSync 허용을 확인해 주세요. 외부망은 NAT 제한으로 직접 연결되지 않을 수 있습니다.'
       : '외부 탐색망에 접근하지 못했습니다. 방화벽의 ClipSync·UDP 허용을 확인해 주세요. 내부 네트워크 탐색은 계속합니다.');
   }, 25000); discoverWarning.unref();

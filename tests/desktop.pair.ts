@@ -196,6 +196,8 @@ test('two packaged desktops with independent OS clipboards', { timeout: 600000 }
     assert.equal((await client.page.evaluate(() => window.clipSync.copyDiagnostics())).ok, true);
     const raw = await clipboard(client); const report = JSON.parse(raw);
     assert.equal(report.lanPeers, 1); assert.equal(report.lan.udpReady, true);
+    assert.ok(report.lan.peerAnnouncements > 0); assert.ok(report.lan.announcementsSent > 0);
+    assert.equal(typeof report.systemVersion, 'string');
     assert.equal(raw.includes(groupKey), false); assert.equal(raw.includes(password), false);
     assert.equal(raw.includes('client-only-before-connection'), false);
     await setTimeout(750); assert.equal(await clipboard(host), groupKey, 'Support report must not be synchronized');
