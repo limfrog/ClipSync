@@ -2,8 +2,6 @@ name: Publish installers
 
 on:
   push:
-    branches: [main]
-    paths: ['.github/workflows/release.yml']
     tags:
       - 'v*'
   workflow_dispatch:
@@ -40,7 +38,7 @@ jobs:
             command: dist:win
             artifact: Windows
             files: release/installers/*-Setup.exe
-          - os: macos-latest
+          - os: macos-26-intel
             command: dist:mac
             artifact: macOS
             files: release/installers/ClipSync-*-macOS-*.pkg
