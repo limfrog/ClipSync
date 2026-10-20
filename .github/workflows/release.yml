@@ -81,6 +81,8 @@ jobs:
           fi
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Verify packaged app contents and selected icons
+        run: node scripts/verify-builder-package.mjs ${{ matrix.artifact }}
       - name: Verify macOS app signatures and packages
         if: runner.os == 'macOS'
         shell: bash
