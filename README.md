@@ -73,9 +73,9 @@ npm run test:pair
 
 ## 설치 파일과 검증
 
-[GitHub Releases](https://github.com/limfrog/ClipSync/releases)에서 자기 OS/CPU에 맞는 설치 파일과 `SHA256SUMS.txt`를 받을 수 있습니다. `v0.3.0`은 클립보드 관리자와 자동 동기화 버전입니다. 설치 전 기존 앱을 **종료**하세요. 배포자 인증서 서명과 Apple 공증은 포함하지 않습니다.
+[GitHub Releases](https://github.com/limfrog/ClipSync/releases)에서 자기 OS/CPU에 맞는 설치 파일과 `SHA256SUMS.txt`를 받을 수 있습니다. `v0.3.1`은 클립보드 관리자와 자동 동기화 버전입니다. 설치 전 기존 앱을 **종료**하세요. 배포자 인증서 서명과 Apple 공증은 포함하지 않습니다.
 
-검증 범위와 결과는 [0.3.0 검증 기록](docs/clipboard-manager-verification.md), 빌드 설정은 [설치 프로그램 안내](docs/installers.md)를 참고하세요. 네트워크 연결이 안 되면 호스트의 로컬 TCP 47832 접근과 Wi-Fi 기기 격리/VPN을 확인하세요. 인터넷에 포트를 개방할 필요는 없습니다.
+검증 범위와 결과는 [0.3.1 검증 기록](docs/clipboard-manager-verification.md), 빌드 설정은 [설치 프로그램 안내](docs/installers.md)를 참고하세요. 네트워크 연결이 안 되면 호스트의 로컬 TCP 47832 접근과 Wi-Fi 기기 격리/VPN을 확인하세요. 인터넷에 포트를 개방할 필요는 없습니다.
 
 ## 데이터 처리와 참고 원본
 

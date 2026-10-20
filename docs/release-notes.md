@@ -1,4 +1,6 @@
-# ClipSync 0.3.0 · 클립보드 관리자
+# ClipSync 0.3.1 · 클립보드 관리자
+
+0.3.1은 이미지·파일 복사 후 직전에 쓰던 같은 텍스트를 다시 복사할 때도 동기화되도록 보완했습니다.
 
 복사한 내용을 기록·검색·고정하고 다시 사용하는 클립보드 관리자에 기기 동기화를 더했습니다. 화면은 400px 폭의 트레이 창으로 바꾸고, 보라색 강조와 업로드 중심 화면을 제거했습니다.
 
@@ -9,10 +11,10 @@
 - 검색·유형 필터·고정, 시스템/다크/라이트 테마, 창 고정, 단축키, 트레이 동작을 지원합니다.
 - 기록은 실행 중 최대 100개이며 종료하면 사라집니다. 받은 파일은 다운로드 폴더의 ClipSync에 남습니다.
 
-설치 전 실행 중인 ClipSync를 **종료**하세요. 자동 동기화를 사용하려면 연결할 PC를 모두 0.3.0으로 업데이트하세요. macOS 13 이상이 필요합니다. 폴더·macOS .app은 ZIP으로 압축해 복사하세요.
+설치 전 실행 중인 ClipSync를 **종료**하세요. 자동 동기화를 사용하려면 연결할 PC를 모두 0.3.1으로 업데이트하세요. macOS 13 이상이 필요합니다. 폴더·macOS .app은 ZIP으로 압축해 복사하세요.
 
 배포자 인증서 서명과 Apple 공증은 포함하지 않습니다. macOS 앱에는 ad-hoc 서명이 있습니다. OS에서 설치·실행이 차단될 수 있습니다.
 
-31개 일반 테스트와 Linux의 독립된 실제 앱 두 개에서 자동 이미지·한글 프로그램·500MB 클립보드 동기화를 검증했습니다. GitHub Actions는 Windows 설치 파일을 Linux에서, Mac 설치 파일을 macOS에서 빌드합니다. Windows 탐색기·macOS Finder의 실제 복사·붙여넣기 및 사용자 설치·제거 동작은 아직 검증하지 않았습니다.
+32개 일반 테스트와 Linux의 독립된 실제 앱 두 개에서 자동 이미지·한글 프로그램·500MB 클립보드 동기화를 검증했습니다. GitHub Actions는 Windows 설치 파일을 Linux에서, Mac 설치 파일을 macOS에서 빌드합니다. Windows 탐색기·macOS Finder의 실제 복사·붙여넣기 및 사용자 설치·제거 동작은 아직 검증하지 않았습니다.
 
-Windows x64는 `ClipSync-0.3.0-Windows-x64-Setup.exe`, Apple Silicon은 `ClipSync-0.3.0-macOS-arm64.pkg`, Intel Mac은 `ClipSync-0.3.0-macOS-x64.pkg`를 선택하세요. 전체 파일의 SHA-256은 `SHA256SUMS.txt`에서 확인할 수 있습니다.
+Windows x64는 `ClipSync-0.3.1-Windows-x64-Setup.exe`, Apple Silicon은 `ClipSync-0.3.1-macOS-arm64.pkg`, Intel Mac은 `ClipSync-0.3.1-macOS-x64.pkg`를 선택하세요. 전체 파일의 SHA-256은 `SHA256SUMS.txt`에서 확인할 수 있습니다.

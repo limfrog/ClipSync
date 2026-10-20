@@ -77,3 +77,18 @@ test('a non-text clipboard is ignored without clearing a peer clipboard', async 
   await until(() => target.text === 'text after image');
   assert.equal(host.state().sent, 1);
 });
+
+test('re-copying the same text after an image or file restores that text on the other clipboard', async t => {
+  let source: string | null = 'before connection', target: string | null = '';
+  const host = new SyncController({ readText: () => source, writeText: text => { source = text; } }, () => {}, 10);
+  const client = new SyncController({ readText: () => target, writeText: text => { target = text; } }, () => {}, 10);
+  t.after(async () => { await client.dispose(); await host.dispose(); });
+  await host.host(0, '127.0.0.1'); await client.join(host.state().invitation);
+  source = '이미지 전후에 똑같이 복사한 한글';
+  await until(() => target === source);
+  source = null; target = null;
+  host.mediaChanged();
+  await setTimeout(40);
+  source = '이미지 전후에 똑같이 복사한 한글';
+  await until(() => target === source, 'Returning to the previous text was not synchronized', 1000);
+});

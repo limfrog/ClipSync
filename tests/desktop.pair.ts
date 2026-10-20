@@ -246,6 +246,7 @@ test('two packaged desktops with independent OS clipboards', { timeout: 240000 }
 
   await check('copying an image automatically synchronizes the real image clipboard without text loops', async () => {
     const before = (await state(host)).sent;
+    const previousText = await clipboard(host);
     await host.app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
       const png = nativeImage.createFromBitmap(Buffer.from([255, 255, 255, 255]), { width: 1, height: 1 }).toPNG();
       await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(png)], { type: 'image/png' }) })]);
@@ -255,6 +256,8 @@ test('two packaged desktops with independent OS clipboards', { timeout: 240000 }
     assert.equal((await state(host)).sent, before);
     assert.equal((await state(host)).transfers.filter(t => t.clipboard).length, 1);
     assert.equal((await state(client)).transfers.filter(t => t.clipboard).length, 1);
+    await copy(host, previousText);
+    await until(async () => await clipboard(client) === previousText, 'Re-copying the same preceding text after an image was lost', 5000);
     await copy(host, 'text after image');
     await until(async () => await clipboard(client) === 'text after image');
   });

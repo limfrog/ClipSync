@@ -192,7 +192,12 @@ export class SyncController {
     return applied;
   }
 
-  mediaChanged() { this.update({ clipboardRevision: this.current.clipboardRevision + 1 }); }
+  mediaChanged() {
+    // The preceding text is no longer the current clipboard representation.
+    // Copying that same text again after a file/image is a new copy operation.
+    this.lastText = null;
+    this.update({ clipboardRevision: this.current.clipboardRevision + 1 });
+  }
   reportError(error: unknown) { this.update({ error: error instanceof Error ? error.message : String(error) }); }
 
   completedFile(id: string) {

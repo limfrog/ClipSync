@@ -27,8 +27,9 @@ async function pair(t: TestContext) {
   const textA = new MemoryClipboard(), textB = new MemoryClipboard();
   const mediaA = new Media(), mediaB = new Media();
   let syncA: MediaSync | undefined, syncB: MediaSync | undefined;
-  const a = new SyncController(textA, s => syncA?.observe(s), 10);
-  const b = new SyncController(textB, s => syncB?.observe(s), 10);
+  // A native clipboard has one current representation; a file/image replaces text.
+  const a = new SyncController({ readText: () => mediaA.current ? null : textA.readText(), writeText: text => { mediaA.current = null; textA.writeText(text); } }, s => syncA?.observe(s), 10);
+  const b = new SyncController({ readText: () => mediaB.current ? null : textB.readText(), writeText: text => { mediaB.current = null; textB.writeText(text); } }, s => syncB?.observe(s), 10);
   await a.host(0, '127.0.0.1'); await b.join(a.state().invitation);
   syncA = new MediaSync(a, mediaA, path.join(root, 'A'), 15);
   syncB = new MediaSync(b, mediaB, path.join(root, 'B'), 15);
@@ -116,7 +117,7 @@ test('a newer copy cancels an older queued media item instead of blocking the cl
   t.after(() => release());
   mediaA.current = await copied('이전 클립보드.exe');
   await until(() => a.state().transfers.some(t => t.status === 'offered'), 'Previous offer was not sent', 5000);
-  textA.text = '더 새로 복사한 내용';
+  mediaA.current = null; textA.text = '더 새로 복사한 내용';
   await until(() => textB.text === textA.text);
   await until(() => a.state().transfers.some(t => t.status === 'cancelled'), 'Old queued copy still blocks synchronization', 5000);
   release();
