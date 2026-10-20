@@ -22,6 +22,20 @@
 
 패키지 두 개의 독립 클립보드 검증은 12개 시나리오(상위 테스트 포함 13개)를 모두 통과했습니다. 결과는 `test-results/pair-report.json`에 기록하며 실행 파일·ASAR 해시, 실제 500MB 프로그램 파일의 전송·SHA-256·한글 파일명/네이티브 파일 클립보드, 이미지 픽셀·재복사·일시정지·재연결을 포함합니다. 이 환경의 500MB 직접 전송은 약 257초가 걸렸으며 전체 검증은 약 275초였습니다. 회선과 NAT·혼잡에 따라 속도가 달라지고 기존 LAN TCP 전송보다 느릴 수 있습니다.
 
+
+## 공개 설치 파일 확인
+
+- 릴리스: [v0.4.0](https://github.com/limfrog/ClipSync/releases/tag/v0.4.0), 빌드 커밋 `9fe54f959a18ee8d4c63761e0e69856f41c89669`.
+- [해당 태그의 Windows/macOS/Linux CI](https://github.com/limfrog/ClipSync/actions/runs/39453710924)는 모두 성공했습니다. Mac의 Dock GUI 실기기 검증을 뜻하지 않습니다.
+- [설치 파일 빌드·공개 작업](https://github.com/limfrog/ClipSync/actions/runs/39453711047) 성공. macOS에서 앱의 `codesign --verify --deep --strict` 및 PKG 확장을 확인했습니다. 배포자 신원 서명/공증을 검증한 것은 아닙니다.
+- 공개 HTTPS 링크로 설치 파일 3개를 전부 다운로드하고 파일 형식·크기·공개 `SHA256SUMS.txt`와의 일치를 확인했습니다. 결과는 로컬 `release/github-download/v0.4.0/download-validation.json`에 있습니다.
+
+| 파일 | 바이트 | SHA-256 |
+| --- | ---: | --- |
+| Windows x64 Setup.exe | 115,983,061 | `c9c6e6329837bb376551ddc7e8c710190ba6333bf085c9bb4dbb0dc6db2d5568` |
+| macOS arm64.pkg | 128,263,381 | `2dc4c343ed193052f4fcba2b8c3c01921b00360a38aaad42fb313e9e57489404` |
+| macOS x64.pkg | 135,201,864 | `b7c33b110600d35996de4da68822b597c2bff75994f003a95f2dff736ccd662c` |
+
 ## 검증 한계
 
 - 공개 DHT의 기본 노드로 18초 동안 접속을 시도했지만 라우팅 노드 0개였고 announce 완료를 확인하지 못했습니다. 따라서 외부 네트워크의 실제 NAT 통과 성공을 주장하지 않습니다. 격리된 DHT 테스트는 실제 UDP와 직접 Noise 소켓을 사용하지만 WAN/통신사 NAT를 재현하지 않습니다.
