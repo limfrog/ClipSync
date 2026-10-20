@@ -1,18 +1,24 @@
 # ClipSync 설치 프로그램
 
-현재 버전은 내부 네트워크 발견·P2P 재연결·연결 상태 보고서를 지원하는 0.4.4입니다. 아래 0.2.0 파일·검증 설명은 최초 설치 파일의 기록이며, 현재 동작과 검증은 [0.4.4 발견 검증 기록](broadcast-discovery-verification.md)과 [Mac–Windows 실물 검증 절차](physical-verification.md)를 참고하세요. 현재 릴리스의 파일명과 SHA-256은 해당 GitHub Release를 기준으로 확인하세요.
+현재 버전은 창 상단 여백 드래그 수정과 투명 배경 A 아이콘을 포함한 0.4.5입니다. Mac 메뉴바는 배경에 따라 흰색·검은색으로 표시되는 전용 템플릿 아이콘을 사용합니다. [릴리스](https://github.com/limfrog/ClipSync/releases/tag/v0.4.5) · [0.4.5 검증 기록](window-drag-verification.md) · [0.4.4 발견 검증 기록](broadcast-discovery-verification.md) · [Mac–Windows 실물 검증 절차](physical-verification.md).
 
 | 대상 | 파일 | 설치 위치 |
 | --- | --- | --- |
-| Windows x64 | `release/installers/ClipSync-0.2.0-Windows-x64-Setup.exe` | `%LOCALAPPDATA%\Programs\ClipSync` |
-| macOS Apple Silicon | `release/installers/ClipSync-0.2.0-macOS-arm64.pkg` | `/Applications/ClipSync.app` |
-| macOS Intel | `release/installers/ClipSync-0.2.0-macOS-x64.pkg` | `/Applications/ClipSync.app` |
+| Windows x64 | [ClipSync-0.4.5-Windows-x64-Setup.exe](https://github.com/limfrog/ClipSync/releases/download/v0.4.5/ClipSync-0.4.5-Windows-x64-Setup.exe) | `%LOCALAPPDATA%\Programs\ClipSync` |
+| macOS Apple Silicon | [ClipSync-0.4.5-macOS-arm64.pkg](https://github.com/limfrog/ClipSync/releases/download/v0.4.5/ClipSync-0.4.5-macOS-arm64.pkg) | `/Applications/ClipSync.app` |
+| macOS Intel | [ClipSync-0.4.5-macOS-x64.pkg](https://github.com/limfrog/ClipSync/releases/download/v0.4.5/ClipSync-0.4.5-macOS-x64.pkg) | `/Applications/ClipSync.app` |
+
+SHA-256は [SHA256SUMS.txt](https://github.com/limfrog/ClipSync/releases/download/v0.4.5/SHA256SUMS.txt)에서 확인할 수 있습니다.
 
 각 파일은 500,000,000바이트보다 작습니다. Windows 설치 화면은 한국어·영어를 지원하며 시작 메뉴·바탕화면 바로가기와 제거 프로그램을 포함합니다. Mac은 자기 CPU에 맞는 PKG를 선택해야 합니다. PKG 설치에는 관리자 권한이 필요합니다. 프로그램을 종료한 뒤 설치하세요.
 
 배포자 인증서 서명과 Apple 공증은 포함하지 않습니다. macOS 앱의 ad-hoc 서명은 코드·리소스 무결성을 위한 서명이며 개발자 신원을 인증하지 않습니다. 운영체제의 개발자 신뢰 검사로 설치·실행이 차단될 수 있습니다. Gatekeeper나 SmartScreen을 전역 해제하는 설정은 제공하지 않습니다. 인증된 일반 배포를 위해서는 Windows 코드 서명 및 Apple Developer ID Application/Installer 인증서와 공증이 추가로 필요합니다.
 
-## 실제 검증 범위
+## 현재 검증과 과거 기록
+
+현재 릴리스 워크플로는 실제 패키지의 앱 버전·파일 구성·선택한 아이콘을 검사합니다. Windows는 실행 파일과 설치 프로그램의 아이콘 리소스를 모두 비교하고, Mac은 두 앱 번들의 ICNS와 `codesign --verify --deep --strict`, PKG 확장을 검사합니다. 배포 파일을 공개 HTTPS 주소에서 다시 받아 SHA-256을 대조합니다. 0.4.5에서 운영체제의 실제 설치 화면·Mac 메뉴바 색 전환을 클라우드에서 실행해 확인한 것은 아닙니다.
+
+사용자는 0.4.4에서 Mac–Windows 연결·텍스트·이미지·한글·300MB 파일, 자동 재연결과 외부 네트워크 연결 성공을 확인했습니다. 아래 내용은 **초기 0.2.0 빌드의 검증 기록**입니다.
 
 Linux에서 Windows 설치 파일을 생성하고 7-Zip의 NSIS 무결성 검사를 수행했습니다. 설치 파일을 별도 임시 디렉터리에 풀어 모든 앱 파일의 SHA-256을 원본과 비교하고, x64 PE 실행 파일 및 제거 프로그램의 포함 여부를 확인했습니다.
 
@@ -20,7 +26,7 @@ macOS는 두 아키텍처의 Electron 앱을 구성하고 고정 버전 `rcodesi
 
 재검증 결과는 `release/installers/installer-validation.json`, 전체 설치 파일의 SHA-256은 같은 폴더의 `SHA256SUMS.txt`에 기록됩니다. 단위·소켓·한글 파일명 테스트 20개도 통과했습니다. 이미지·실제 500MB 파일과 앱 두 개의 Linux 전송 검증은 [이전 기능 검증 기록](file-transfer-verification.md)에 있습니다.
 
-**Windows/macOS에서 실제 설치·제거·실행, 두 운영체제 사이의 실제 파일 교환은 아직 검증하지 않았습니다.** 클라우드 환경에는 해당 OS 런타임이 없습니다. `.github/workflows/installers.yml`은 각 OS의 빌드·정적 검증을 실행할 수 있도록 준비한 워크플로이며, 이번 환경에서 원격 실행하지 않았습니다.
+당시 0.2.0 검사에서는 Windows/macOS의 실제 설치·제거·실행과 두 운영체제 사이 파일 교환을 확인하지 않았습니다. 이후 검증과 사용자 실물 확인 결과는 위 링크의 버전별 기록을 기준으로 확인하세요.
 
 ## 다시 빌드하기
 
