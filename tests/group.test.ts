@@ -82,18 +82,19 @@ test('remembered Noise identity and DHT nodes restore a direct connection withou
   const input = { groupKey: createGroupKey(), password: 'remember-peer-1234' };
   let credentials = await deriveGroup(input);
   const other = await deriveGroup(input);
-  let count = 0; const texts: string[] = [];
+  let count = 0, otherCount = 0; const texts: string[] = [];
   const callbacks = { onText: (text: string) => { texts.push(text); }, onPeers: (peers: number) => { count = peers; }, onDevices: () => {}, onTransfer: () => {}, onStatus: () => {} };
   const first = groupSession(credentials, callbacks, { bootstrap: network.bootstrap, lan: false, onHints: hints => { credentials = { ...credentials, ...hints }; } });
   sessions.push(first);
-  const peer = groupSession(other, { ...callbacks, onPeers: () => {} }, { bootstrap: network.bootstrap, lan: false }); sessions.push(peer);
-  await until(() => count === 1, 'Initial DHT connection', 10000);
+  const peer = groupSession(other, { ...callbacks, onPeers: peers => { otherCount = peers; } }, { bootstrap: network.bootstrap, lan: false }); sessions.push(peer);
+  await until(() => count === 1 && otherCount === 1, 'Initial DHT connection', 10000);
   assert.equal(credentials.peers?.length, 1); assert.ok(credentials.nodes?.length);
   await first.close(); count = 0;
+  await until(() => otherCount === 0, 'Peer must observe the previous connection closing');
   // Deliberately give the restarted peer an unrelated topic: only cached peer lookup can find B.
   const restored = groupSession({ ...credentials, room: randomBytes(32).toString('base64url') }, callbacks, { bootstrap: network.bootstrap, lan: false }); sessions.push(restored);
   const before = Date.now();
-  await until(() => count === 1, 'Known peer should bypass topic matching', 8000);
+  await until(() => count === 1 && otherCount === 1, 'Known peer should bypass topic matching', 8000);
   t.diagnostic(`cached identity reconnect through isolated DHT: ${Date.now() - before} ms`);
   peer.publish('기억한 기기에 바로 연결'); await until(() => texts.includes('기억한 기기에 바로 연결'));
   assert.equal(restored.diagnostics().lanPeers, 0); assert.equal(restored.diagnostics().relayAttempts, 0);
