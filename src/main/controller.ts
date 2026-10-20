@@ -3,11 +3,15 @@ import type { SyncState } from '../shared/api';
 import { createInvitation, createKey, MAX_TEXT_BYTES, parseInvitation } from './protocol';
 import { hostSession, joinSession, type Session } from './session';
 import { TransferManager } from './transfers';
-import type { Peer, TransferPacket } from '../shared/transfers';
+import type { ClipboardBatch, Peer, TransferPacket } from '../shared/transfers';
+import type { HistoryItem } from '../shared/history';
+import { ClipboardHistory } from './history';
 
 export interface Clipboard { readText(): string | null | Promise<string | null>; writeText(text: string): void | Promise<void> }
 
 export class SyncController {
+  private readonly history = new ClipboardHistory();
+  private readonly recordedTransfers = new Set<string>();
   private session: Session | null = null;
   private files: TransferManager | null = null;
   private readonly savedFiles = new Map<string, { path: string; image: boolean }>();
@@ -18,15 +22,16 @@ export class SyncController {
   private readonly timer: ReturnType<typeof setInterval>;
   private current: SyncState = {
     mode: 'idle', paused: false, peers: 0, invitation: '', sent: 0,
-    received: 0, lastActivity: null, error: null, devices: [], transfers: [],
+    received: 0, lastActivity: null, error: null, devices: [], transfers: [], history: [], clipboardRevision: 0, historyRevision: 0,
   };
 
   constructor(private readonly clipboard: Clipboard, private readonly changed: (state: SyncState) => void, interval = 350) {
+    void this.enqueue(async () => { this.lastText = await this.clipboard.readText(); }).catch(() => {});
     this.timer = setInterval(() => { void this.poll(); }, interval);
     this.timer.unref();
   }
 
-  state(): SyncState { return { ...this.current, devices: this.current.devices.map(p => ({ ...p })), transfers: this.current.transfers.map(t => ({ ...t })) }; }
+  state(): SyncState { return { ...this.current, historyRevision: this.history.revision, history: this.history.state(), devices: this.current.devices.map(p => ({ ...p })), transfers: this.current.transfers.map(t => ({ ...t })) }; }
 
   private enqueue<T>(action: () => T | Promise<T>): Promise<T> {
     const next = this.clipboardQueue.then(action);
@@ -45,7 +50,10 @@ export class SyncController {
         if (!this.session || this.current.paused) return;
         await this.clipboard.writeText(text);
         this.lastText = text;
-        if (!localEcho) this.update({ received: this.current.received + 1, lastActivity: new Date().toISOString(), error: null });
+        if (!localEcho) {
+          this.history.recordText(text, 'remote');
+          this.update({ received: this.current.received + 1, lastActivity: new Date().toISOString(), error: null, clipboardRevision: this.current.clipboardRevision + 1 });
+        }
       }).catch(() => this.update({ error: '클립보드에 쓸 수 없습니다. 앱 권한을 확인해 주세요.' }));
     },
     onPeers: (peers: number) => this.update({ peers }),
@@ -64,8 +72,13 @@ export class SyncController {
       const files = new TransferManager((packet, to) => session.sendTransfer(packet, to), transfers => {
         for (const transfer of transfers) {
           if (transfer.direction === 'receive' && transfer.status === 'completed') this.savedFiles.set(transfer.id, files.completedFile(transfer.id));
+          if (transfer.status === 'completed' && !this.recordedTransfers.has(transfer.id)) {
+            this.recordedTransfers.add(transfer.id);
+            this.history.recordTransfer(transfer);
+          }
         }
-        while (this.savedFiles.size > 24) this.savedFiles.delete(this.savedFiles.keys().next().value!);
+        while (this.savedFiles.size > 100) this.savedFiles.delete(this.savedFiles.keys().next().value!);
+        while (this.recordedTransfers.size > 200) this.recordedTransfers.delete(this.recordedTransfers.values().next().value!);
         this.update({ transfers });
       });
       this.files = files;
@@ -131,9 +144,9 @@ export class SyncController {
     });
   }
 
-  async sendFile(file: string, peerId: string, image = false, temporary = false) {
+  async sendFile(file: string, peerId: string, image = false, temporary = false, batch?: ClipboardBatch, revision?: number) {
     if (!this.files || !this.current.devices.some(peer => peer.id === peerId)) throw new Error('받을 PC를 먼저 선택해 주세요.');
-    await this.files.offer(file, peerId, image, temporary);
+    return this.files.offer(file, peerId, image, temporary, batch, batch ? () => this.current.clipboardRevision === revision && !this.current.paused : undefined);
   }
 
   async acceptTransfer(id: string, destination: string) {
@@ -141,7 +154,46 @@ export class SyncController {
     await this.files.accept(id, destination);
   }
 
-  async cancelTransfer(id: string) { await this.files?.cancel(id); }
+  async cancelTransfer(id: string, reason?: string) { await this.files?.cancel(id, reason); }
+
+  async manageHistory(action: string, id?: string) {
+    if (action === 'clear') this.history.clear();
+    else {
+      if (typeof id !== 'string') throw new Error('기록을 선택해 주세요.');
+      if (action === 'copy') {
+        const text = this.history.text(id);
+        await this.enqueue(async () => {
+          await this.clipboard.writeText(text); this.lastText = text;
+          this.history.recordText(text, 'local'); this.current.clipboardRevision++;
+          if (this.session && this.current.peers && !this.current.paused) {
+            this.session.publish(text);
+            this.current.sent++; this.current.lastActivity = new Date().toISOString();
+          }
+        });
+      } else if (action === 'pin') this.history.pin(id);
+      else if (action === 'delete') this.history.delete(id);
+      else throw new Error('잘못된 기록 요청입니다.');
+    }
+    this.update({});
+  }
+
+  recordMedia(item: Pick<HistoryItem, 'id' | 'type' | 'preview' | 'source' | 'size' | 'thumbnail'>) {
+    this.history.recordMedia(item);
+    this.update({});
+  }
+
+  async applyMedia(action: () => Promise<void>, expectedRevision?: number) {
+    let applied = false;
+    await this.enqueue(async () => {
+      if (expectedRevision !== undefined && (!this.session || this.current.paused || this.current.clipboardRevision !== expectedRevision)) return;
+      await action(); this.lastText = await this.clipboard.readText(); applied = true;
+    });
+    if (applied) this.update({ clipboardRevision: this.current.clipboardRevision + 1 });
+    return applied;
+  }
+
+  mediaChanged() { this.update({ clipboardRevision: this.current.clipboardRevision + 1 }); }
+  reportError(error: unknown) { this.update({ error: error instanceof Error ? error.message : String(error) }); }
 
   completedFile(id: string) {
     const saved = this.savedFiles.get(id);
@@ -151,18 +203,21 @@ export class SyncController {
   }
 
   private async poll() {
-    if (!this.session || this.current.paused || this.polling || this.connecting) return;
+    if (this.current.paused || this.polling || this.connecting) return;
     this.polling = true;
     try {
       await this.enqueue(async () => {
         const text = await this.clipboard.readText();
-        if (!this.session || this.current.paused || text === null || text === this.lastText) return;
+        if (this.current.paused || text === null || text === this.lastText) return;
         this.lastText = text;
-        if (this.current.peers === 0) return;
+        if (text.startsWith('clipsync://')) return;
         if (Buffer.byteLength(text, 'utf8') > MAX_TEXT_BYTES) {
           this.update({ error: '1MB를 초과한 텍스트는 건너뛰었습니다.' });
           return;
         }
+        this.history.recordText(text, 'local');
+        this.current.clipboardRevision++;
+        if (!this.session || this.current.peers === 0) { this.update({}); return; }
         this.session.publish(text);
         this.update({ sent: this.current.sent + 1, lastActivity: new Date().toISOString(), error: null });
       });

@@ -1,144 +1,198 @@
 import './style.css';
 import type { ClipSyncAPI, Result, SyncState } from '../shared/api';
+import { DEFAULT_PREFERENCES, type HistoryItem, type Preferences } from '../shared/history';
 import type { TransferState } from '../shared/transfers';
 
 declare global { interface Window { clipSync: ClipSyncAPI } }
-
 function element<T extends HTMLElement = HTMLElement>(id: string): T {
   const found = document.getElementById(id);
   if (!found) throw new Error(`Missing element: ${id}`);
   return found as T;
 }
-
+const connection = element<HTMLDialogElement>('connection-dialog');
+const settings = element<HTMLDialogElement>('settings-dialog');
 let current: SyncState;
+let preferences: Preferences = { ...DEFAULT_PREFERENCES };
 let busy = false;
-let noticeTimer: ReturnType<typeof setTimeout> | undefined;
-let renderedPeers = '';
-let renderedTransfers = '';
+let filter = 'all';
+let historySignature = '';
+let transferSignature = '';
+let peerSignature = '';
+let toastTimer: ReturnType<typeof setTimeout>;
 
-function render(state: SyncState) {
-  current = state;
-  const connected = state.mode !== 'idle';
-  element('status').textContent = state.paused ? '일시정지' : connected ? '연결 열림' : '연결 대기';
-  element('status').classList.toggle('connected', connected && !state.paused);
-  element('session-actions').hidden = !connected;
-  element('connection-grid').hidden = connected;
-  element('invitation-panel').hidden = state.mode !== 'hosting';
-  element('pause').textContent = state.paused ? '동기화 재개' : '일시정지';
-  element('session-title').textContent = state.paused ? '이 PC의 동기화를 잠시 멈췄어요' : state.mode === 'hosting' ? (state.peers ? 'PC들이 연결됐어요' : '다른 PC의 참여를 기다리고 있어요') : state.mode === 'joined' ? '호스트 PC와 연결됐어요' : 'PC를 연결할 준비가 됐어요';
-  element('session-detail').textContent = state.paused ? '재개한 뒤 새로 복사하는 텍스트부터 공유합니다.' : connected ? '새 텍스트를 복사한 뒤, 연결된 PC에서 붙여넣어 보세요.' : '한 PC에서 연결을 열고, 다른 PC에서 참여하세요.';
-  element('peer-count').textContent = String(state.peers);
-  element('sent-count').textContent = String(state.sent);
-  element('received-count').textContent = String(state.received);
-  element('last-activity').textContent = state.lastActivity ? new Date(state.lastActivity).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '아직 없어요';
-  showError(state.error);
-  const signature = JSON.stringify(state.devices);
-  if (signature !== renderedPeers) {
-    renderedPeers = signature;
-    const select = element<HTMLSelectElement>('recipient');
-    const previous = select.value;
-    select.replaceChildren(...state.devices.map(peer => new Option(`${peer.name} · ${peer.id === 'host' ? '호스트' : peer.id.slice(0, 6)}`, peer.id)));
-    if (!state.devices.length) select.add(new Option('연결된 PC가 없습니다', ''));
-    if (state.devices.some(peer => peer.id === previous)) select.value = previous;
-  }
-  renderTransfers(state.transfers);
-  updateEnabled();
+function notice(message: string) {
+  element('notice').textContent = message;
+  element('notice').hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { element('notice').hidden = true; }, 3000);
 }
-
-function size(bytes: number) { return bytes >= 1_000_000 ? `${(bytes / 1_000_000).toLocaleString('ko-KR', { maximumFractionDigits: 1 })} MB` : `${(bytes / 1000).toLocaleString('ko-KR', { maximumFractionDigits: 1 })} KB`; }
-
-function renderTransfers(transfers: TransferState[]) {
-  const signature = JSON.stringify(transfers);
-  if (signature === renderedTransfers) return;
-  renderedTransfers = signature;
-  const list = element('transfer-list');
-  list.replaceChildren();
-  if (!transfers.length) {
-    const empty = document.createElement('p'); empty.className = 'empty-transfers'; empty.textContent = '아직 주고받은 파일이 없습니다.'; list.append(empty); return;
-  }
-  for (const transfer of [...transfers].reverse()) {
-    const row = document.createElement('article'); row.className = 'transfer-row'; row.dataset.transferId = transfer.id;
-    const info = document.createElement('div'); info.className = 'transfer-info';
-    const name = document.createElement('strong'); name.textContent = transfer.name;
-    const detail = document.createElement('p');
-    const labels = { offered: transfer.direction === 'receive' ? '수신 대기' : '상대 PC의 수락 대기', sending: '보내는 중', receiving: '받는 중', completed: '전송 완료', cancelled: '취소됨', failed: '전송 실패' };
-    detail.textContent = `${transfer.direction === 'send' ? '보내기' : '받기'} · ${labels[transfer.status]} · ${size(transfer.bytes)} / ${size(transfer.size)}${transfer.error ? ` · ${transfer.error}` : ''}`;
-    info.append(name, detail);
-    if (transfer.status === 'sending' || transfer.status === 'receiving') {
-      const progress = document.createElement('progress'); progress.max = transfer.size || 1; progress.value = transfer.bytes; progress.setAttribute('aria-label', `${transfer.name} 전송 진행률`); info.append(progress);
-    }
-    const actions = document.createElement('div'); actions.className = 'transfer-actions';
-    function button(text: string, action: string) {
-      const button = document.createElement('button'); button.className = 'button secondary'; button.textContent = text; button.dataset.action = action; button.dataset.id = transfer.id; actions.append(button);
-    }
-    if (transfer.status === 'offered' && transfer.direction === 'receive') button('받기', 'accept');
-    if (['offered', 'sending', 'receiving'].includes(transfer.status)) button(transfer.direction === 'receive' && transfer.status === 'offered' ? '거절' : '취소', 'cancel');
-    if (transfer.status === 'completed' && transfer.direction === 'receive') { button('폴더 열기', 'show'); if (transfer.image) button('이미지 복사', 'copy'); }
-    row.append(info, actions); list.append(row);
-  }
-}
-
-function updateEnabled() {
-  document.querySelectorAll<HTMLButtonElement>('button').forEach(button => { button.disabled = busy; });
-  for (const id of ['send-file', 'send-image']) element<HTMLButtonElement>(id).disabled = busy || !current?.devices.length;
-  element<HTMLSelectElement>('recipient').disabled = busy || !current?.devices.length;
-}
-
 function showError(message: string | null) {
-  element('error').hidden = !message;
-  element('error').textContent = message ?? '';
+  for (const [id, visible] of [['error', !connection.open && !settings.open], ['connection-error', connection.open], ['settings-error', settings.open]] as const) {
+    element(id).textContent = message ?? '';
+    element(id).hidden = !message || !visible;
+  }
 }
-
-async function act(action: () => Promise<Result>) {
+function enabled() {
+  document.querySelectorAll<HTMLButtonElement>('button').forEach(button => { button.disabled = busy; });
+}
+async function act(action: () => Promise<Result>, success?: string) {
   if (busy) return;
-  busy = true;
-  showError(null);
-  updateEnabled();
+  busy = true; enabled(); showError(null);
   try {
     const result = await action();
     if (!result.ok) showError(result.error ?? '요청을 처리할 수 없습니다.');
-  } catch {
-    showError('앱과 통신할 수 없습니다. 앱을 다시 실행해 주세요.');
-  } finally {
-    busy = false;
-    updateEnabled();
+    else if (success) notice(success);
+    return result;
+  } catch { showError('앱과 통신할 수 없습니다. 다시 시도해 주세요.'); }
+  finally { busy = false; enabled(); }
+}
+function updatePreferences(value: Preferences) {
+  preferences = value;
+  document.documentElement.dataset.theme = value.theme;
+  element('pin-window').setAttribute('aria-pressed', String(value.alwaysOnTop));
+  element('shortcut').textContent = value.shortcutAvailable === false ? '단축키 사용 불가' : value.shortcut.replace(/CommandOrControl/g, 'Ctrl/⌘').replaceAll('+', ' + ');
+}
+function render(state: SyncState) {
+  current = state;
+  const connected = state.mode !== 'idle';
+  element('status').textContent = state.paused ? '동기화 일시정지' : state.peers ? `${state.peers}대 연결됨` : connected ? '다른 PC 대기 중' : '연결 대기';
+  element('status').classList.toggle('connected', connected && !state.paused);
+  element('connection-grid').hidden = connected;
+  element('invitation-panel').hidden = state.mode !== 'hosting';
+  element('session-actions').hidden = !connected;
+  element('session-title').textContent = state.paused ? '재개한 뒤 새로 복사하는 내용부터 동기화합니다.' : '텍스트·이미지·파일 클립보드를 자동으로 동기화합니다.';
+  element('pause').textContent = state.paused ? '동기화 재개' : '일시정지';
+  for (const [id, value] of [['peer-count', state.peers], ['sent-count', state.sent], ['received-count', state.received]] as const) element(id).textContent = String(value);
+  showError(state.error);
+  const signature = JSON.stringify(state.devices);
+  if (signature !== peerSignature) {
+    peerSignature = signature;
+    const devices = element('devices'); devices.replaceChildren();
+    for (const name of ['이 PC', ...state.devices.map(peer => peer.name)]) {
+      const chip = document.createElement('span'); chip.className = 'device-chip'; chip.textContent = name; devices.append(chip);
+    }
+    if (!state.devices.length) { const hint = document.createElement('span'); hint.className = 'device-hint'; hint.textContent = '기기 연결에서 다른 PC를 추가하세요'; devices.append(hint); }
+  }
+  const transfers = state.transfers.filter(t => t.status !== 'completed');
+  const transfersKey = JSON.stringify(transfers);
+  if (transfersKey !== transferSignature) {
+    transferSignature = transfersKey;
+    element('transfer-list').replaceChildren(...transfers.slice().reverse().map(t => transferCard(t)));
+  }
+  renderHistory(); enabled();
+}
+function size(bytes: number) { return bytes >= 1_000_000 ? `${(bytes / 1_000_000).toLocaleString('ko-KR', { maximumFractionDigits: 1 })} MB` : `${(bytes / 1000).toLocaleString('ko-KR', { maximumFractionDigits: 1 })} KB`; }
+function actionButton(label: string, action: string, id: string, className = 'button secondary') {
+  const button = document.createElement('button'); button.type = 'button'; button.className = className; button.textContent = label; button.dataset.action = action; button.dataset.id = id; return button;
+}
+function transferCard(transfer: TransferState) {
+  const row = document.createElement('article'); row.className = 'clip-card transfer-row'; row.dataset.transferId = transfer.id;
+  const info = document.createElement('div'); info.className = 'transfer-info';
+  const name = document.createElement('strong'); name.textContent = `${transfer.image ? '▧' : '↗'}  ${transfer.name}`;
+  const detail = document.createElement('p');
+  const labels = { offered: transfer.direction === 'receive' ? '수신 대기' : '상대 PC의 수락 대기', sending: '보내는 중', receiving: '받는 중', completed: '전송 완료', cancelled: '취소됨', failed: '전송 실패' };
+  detail.textContent = `${transfer.clipboard ? '클립보드 동기화' : transfer.direction === 'send' ? '보내기' : '받기'} · ${labels[transfer.status]} · ${size(transfer.bytes)} / ${size(transfer.size)}${transfer.error ? ` · ${transfer.error}` : ''}`;
+  info.append(name, detail); row.append(info);
+  if (transfer.status === 'sending' || transfer.status === 'receiving') {
+    const progress = document.createElement('progress'); progress.max = transfer.size || 1; progress.value = transfer.bytes; progress.setAttribute('aria-label', `${transfer.name} 전송 진행률`); info.append(progress);
+  }
+  const actions = document.createElement('div'); actions.className = 'transfer-actions';
+  if (!transfer.clipboard && transfer.status === 'offered' && transfer.direction === 'receive') actions.append(actionButton('받기', 'accept', transfer.id));
+  if (['offered', 'sending', 'receiving'].includes(transfer.status)) actions.append(actionButton(transfer.direction === 'receive' && transfer.status === 'offered' ? '거절' : '취소', 'cancel', transfer.id));
+  if (transfer.status === 'completed' && transfer.direction === 'receive') {
+    actions.append(actionButton('폴더 열기', 'show', transfer.id));
+    if (transfer.image) actions.append(actionButton('이미지 복사', 'image', transfer.id));
+  }
+  row.append(actions); return row;
+}
+function historyCard(item: HistoryItem, latest: boolean) {
+  const card = item.transfer ? transferCard(item.transfer) : document.createElement('article');
+  card.classList.add('clip-card'); card.classList.toggle('latest-active', latest); card.dataset.historyId = item.id;
+  const top = document.createElement('div'); top.className = 'clip-top';
+  const type = document.createElement('span'); type.className = 'clip-type'; type.textContent = item.type === 'text' ? (/^https?:\/\/\S+$/.test(item.preview) ? 'LINK' : 'TEXT') : item.type === 'image' ? 'IMAGE' : 'FILE';
+  const time = document.createElement('time'); time.dateTime = item.copiedAt; time.textContent = new Date(item.copiedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  top.append(type, time); card.prepend(top);
+  if (item.type === 'text' || item.mediaId) {
+    const preview = actionButton(item.preview, 'copy', item.id, 'clip-preview'); preview.title = '클릭하여 다시 복사'; card.append(preview);
+    if (item.thumbnail) { const image = document.createElement('img'); image.className = 'media-preview'; image.src = item.thumbnail; image.alt = '클립보드 이미지 미리보기'; preview.append(image); }
+    if (item.size !== undefined) { const meta = document.createElement('p'); meta.className = 'media-size'; meta.textContent = `${size(item.size)} · 클릭하면 클립보드로 복사`; card.append(meta); }
+  }
+  const bottom = document.createElement('div'); bottom.className = 'clip-bottom';
+  const source = document.createElement('span'); source.textContent = `${item.source === 'local' ? '이 PC' : '연결된 PC'}${item.pinned ? ' · 고정됨' : ''}`;
+  const actions = document.createElement('div'); actions.className = 'clip-actions';
+  if (item.type === 'text' || item.mediaId) actions.append(actionButton('복사', 'copy', item.id, ''));
+  const pin = actionButton(item.pinned ? '고정 해제' : '고정', 'pin', item.id, ''); pin.setAttribute('aria-pressed', String(item.pinned));
+  actions.append(pin, actionButton('삭제', 'delete', item.id, ''));
+  bottom.append(source, actions); card.append(bottom); return card;
+}
+function renderHistory() {
+  if (!current) return;
+  const query = element<HTMLInputElement>('search').value.toLocaleLowerCase();
+  const key = JSON.stringify([current.history, query, filter]);
+  if (key === historySignature) return;
+  historySignature = key;
+  const items = current.history.filter(item => (filter === 'all' || (filter === 'pinned' ? item.pinned : item.type === filter)) && item.preview.toLocaleLowerCase().includes(query)).sort((a, b) => Number(b.pinned) - Number(a.pinned));
+  const list = element('history-list'); list.replaceChildren(...items.map((item, index) => historyCard(item, index === 0)));
+  if (!items.length) {
+    const empty = document.createElement('div'); empty.className = 'empty-history';
+    const icon = document.createElement('span'); icon.className = 'empty-icon'; icon.textContent = '▤'; icon.ariaHidden = 'true';
+    const heading = document.createElement('h2'); heading.textContent = current.history.length || filter !== 'all' || query ? '일치하는 기록이 없어요' : '클립보드가 비어 있어요';
+    const hint = document.createElement('p'); hint.textContent = current.history.length || filter !== 'all' || query ? '검색어나 기록 유형을 바꿔보세요.' : '텍스트, 스크린샷, 파일을 복사해 보세요. 기록을 클릭하면 다시 사용할 수 있어요.';
+    empty.append(icon, heading, hint); list.append(empty);
   }
 }
 
+for (const id of ['open-connection', 'open-settings']) element(id).addEventListener('click', () => {
+  if (id === 'open-connection') connection.showModal();
+  else {
+    element<HTMLSelectElement>('theme').value = preferences.theme;
+    element<HTMLInputElement>('shortcut-setting').value = preferences.shortcut;
+    element<HTMLInputElement>('always-on-top').checked = preferences.alwaysOnTop;
+    settings.showModal();
+  }
+});
+document.querySelectorAll<HTMLButtonElement>('[data-close]').forEach(button => button.addEventListener('click', () => element<HTMLDialogElement>(button.dataset.close!).close()));
+element('search').addEventListener('input', renderHistory);
+document.querySelectorAll<HTMLButtonElement>('[data-filter]').forEach(button => button.addEventListener('click', () => {
+  filter = button.dataset.filter!;
+  document.querySelectorAll('[data-filter]').forEach(tab => tab.setAttribute('aria-selected', String(tab === button)));
+  renderHistory();
+}));
 element('host').addEventListener('click', () => { void act(() => window.clipSync.host()); });
 element('join-form').addEventListener('submit', event => {
-  event.preventDefault();
-  const code = element<HTMLInputElement>('invitation').value.trim();
-  void act(async () => {
-    const result = await window.clipSync.join(code);
-    if (result.ok) element<HTMLInputElement>('invitation').value = '';
-    return result;
-  });
+  event.preventDefault(); const code = element<HTMLInputElement>('invitation').value.trim();
+  void act(async () => { const result = await window.clipSync.join(code); if (result.ok) { element<HTMLInputElement>('invitation').value = ''; connection.close(); } return result; });
 });
+element('copy-invitation').addEventListener('click', () => { void act(() => window.clipSync.copyInvitation(), '초대 코드를 복사했어요. 신뢰하는 PC에 전달하세요.'); });
 element('pause').addEventListener('click', () => { void act(() => window.clipSync.pause(!current.paused)); });
 element('disconnect').addEventListener('click', () => { void act(() => window.clipSync.disconnect()); });
-element('send-file').addEventListener('click', () => { void act(() => window.clipSync.chooseFile(element<HTMLSelectElement>('recipient').value)); });
-element('send-image').addEventListener('click', () => { void act(() => window.clipSync.sendImage(element<HTMLSelectElement>('recipient').value)); });
-element('transfer-list').addEventListener('click', event => {
+element('settings-form').addEventListener('submit', event => {
+  event.preventDefault();
+  void act(async () => {
+    const result = await window.clipSync.configure({ theme: element<HTMLSelectElement>('theme').value as Preferences['theme'], shortcut: element<HTMLInputElement>('shortcut-setting').value.trim(), alwaysOnTop: element<HTMLInputElement>('always-on-top').checked });
+    if (result.ok) settings.close(); return result;
+  }, '설정을 저장했어요.');
+});
+element('pin-window').addEventListener('click', () => { void act(() => window.clipSync.configure({ ...preferences, alwaysOnTop: !preferences.alwaysOnTop })); });
+element('hide-window').addEventListener('click', () => { void act(() => window.clipSync.hide()); });
+element('quit').addEventListener('click', () => { void act(() => window.clipSync.quit()); });
+element('open-downloads').addEventListener('click', () => { void act(() => window.clipSync.openDownloads()); });
+element('clear-history').addEventListener('click', () => { void act(() => window.clipSync.history('clear'), '고정한 항목을 남기고 기록을 비웠어요.'); });
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !connection.open && !settings.open) { event.preventDefault(); void act(() => window.clipSync.hide()); }
+});
+element('history-list').addEventListener('click', dispatchAction);
+element('transfer-list').addEventListener('click', dispatchAction);
+function dispatchAction(event: MouseEvent) {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-action]');
   if (!button?.dataset.id) return;
   const id = button.dataset.id;
-  const actions: Record<string, () => Promise<Result>> = { accept: () => window.clipSync.acceptTransfer(id), cancel: () => window.clipSync.cancelTransfer(id), show: () => window.clipSync.showFile(id), copy: () => window.clipSync.copyImage(id) };
-  const action = actions[button.dataset.action!];
-  if (action) void act(action);
-});
-element('copy-invitation').addEventListener('click', () => {
-  void act(async () => {
-    const result = await window.clipSync.copyInvitation();
-    if (result.ok) {
-      element('notice').textContent = '초대 코드를 복사했어요. 연결할 PC에 전달해 주세요.';
-      element('notice').hidden = false;
-      clearTimeout(noticeTimer);
-      noticeTimer = setTimeout(() => { element('notice').hidden = true; }, 4000);
-    }
-    return result;
-  });
-});
-
+  const actions: Record<string, () => Promise<Result>> = {
+    accept: () => window.clipSync.acceptTransfer(id), cancel: () => window.clipSync.cancelTransfer(id), show: () => window.clipSync.showFile(id), image: () => window.clipSync.copyImage(id),
+    copy: () => window.clipSync.history('copy', id), pin: () => window.clipSync.history('pin', id), delete: () => window.clipSync.history('delete', id),
+  };
+  if (actions[button.dataset.action!]) void act(actions[button.dataset.action!], button.dataset.action === 'copy' || button.dataset.action === 'image' ? '클립보드에 복사했어요.' : undefined);
+}
 window.clipSync.subscribe(render);
-void window.clipSync.state().then(render).catch(() => showError('앱을 다시 실행해 주세요.'));
+window.clipSync.onPreferences(updatePreferences);
+void Promise.all([window.clipSync.state().then(render), window.clipSync.preferences().then(updatePreferences)]).catch(() => showError('앱을 다시 실행해 주세요.'));

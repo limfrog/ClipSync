@@ -1,0 +1,31 @@
+# ClipSync 0.3.0 검증 기록
+
+사용자 제공 `limfrog/ClipSync_Original` 커밋 `088efd75f6232840694fbd8616c8942dc9602360`에서 트레이·기록 중심 동작을 참고했습니다. 원본 저장소는 수정하지 않았으며, 사용자 요청에 따라 보라색을 없애고 별도 파일 전송 대신 클립보드 자동 동기화로 바꿨습니다.
+
+## 실행한 검사
+
+- `npm run build`: 타입 검사와 Electron/renderer 빌드 통과.
+- `npm test`: 일반 테스트 31개. 텍스트·암호화·인증·한글 파일명, 기록의 중복·고정·메모리 한도, 자동 수신, 여러 파일의 일괄 등록, 재복사의 역방향 동기화, 최신 복사 우선 처리, 일시정지, 잘못된 메타데이터와 묶음 중단을 검사했습니다.
+- `node scripts/test-desktop.mjs`: 실제 Electron 창에서 검색·유형 탭·고정·다시 복사·비우기, 테마 저장과 창 고정·숨김·다시 열기, 실제 OS 텍스트 클립보드 동기화 통과.
+- `npm run package` 후 `npm run test:pair`: 독립된 Xvfb 디스플레이와 앱 프로필의 실제 앱 두 개로 12개 시나리오 통과(상위 테스트 포함 13개). PNG가 자동으로 상대 OS 클립보드에 들어가며 픽셀을 보존했습니다. 한글 프로그램을 파일 클립보드에 복사하는 것만으로 반대편 파일 참조와 원본 바이트를 확인했습니다.
+- 같은 테스트에서 500,000,000바이트 프로그램의 자동 수신과 양쪽 SHA-256 일치 통과. 버튼을 통한 보내기·받기·이미지 복사를 사용하지 않았습니다. 실제 500MB 동기화 시간은 약 11.3초입니다.
+- `npm run test:large`: 실제 암호화 소켓의 500MB 전송·메모리 검사 통과.
+
+파일 이름의 NFC/NFD, 파일 내용과 CP949 바이트 보존, 제한 초과·변조·취소 시 조각 파일 정리도 검사했습니다. 프로그램을 실행하지 않습니다.
+
+## 검증한 묶음
+
+- 환경: Linux x64, Electron 44.9.1, Node.js 24.
+- 버전: `0.3.0`.
+- 앱 ASAR SHA-256: `e19af42e765f26449ff0897eeabc9af3f455ca46a638a0352f02d9ec3dad0b10`.
+- Electron 실행 파일 SHA-256: `3ba9114b7fbaafaf548f72c5d1bc86b7dc81098a85361784359c2c1199625bfc`.
+- 세부 결과: `test-results/pair-report.json`, `test-results/large-transfer.json`.
+- 실제 화면: [다크](screenshots/clipboard-dark.png), [라이트](screenshots/clipboard-light.png).
+
+## 남은 플랫폼 검사와 동작 범위
+
+Windows 탐색기와 macOS Finder의 실제 복사·붙여넣기, 실제 설치·제거, OS 트레이의 실제 메뉴 막대 조작은 이 Linux 클라우드에서 확인할 수 없습니다. Electron의 문서화된 `text/uri-list` ↔ native copied-files 매핑을 사용하며, Linux의 실제 URI 클립보드는 검증했습니다. 자동 동기화를 사용하려면 양쪽 앱을 0.3.0으로 업데이트해야 합니다.
+
+현재 동기화는 연결 후 새로 복사한 일반 텍스트·PNG·파일 참조와 기록의 명시적 재복사입니다. 원본의 클라우드 릴레이, 서버 주소·동기화 키, 모바일 웹/iOS 단축어는 구현 범위에 포함하지 않았습니다. 기록은 세션 메모리이고 받은 파일은 다운로드 폴더의 ClipSync에 남습니다. 폴더는 ZIP으로 압축해야 합니다.
+
+GitHub 릴리스 산출물은 각 CI 빌드의 새 파일이며 위 Linux ASAR와 전체 파일 해시는 다를 수 있습니다. 릴리스 자체의 SHA-256은 해당 릴리스의 SHA256SUMS.txt를 기준으로 확인하세요. Windows 설치 프로그램은 Linux NSIS 빌드, Mac PKG는 macOS 빌드를 사용합니다. 배포자 인증서 서명과 Apple 공증은 포함하지 않습니다.

@@ -1,7 +1,7 @@
 {
   "name": "clipsync",
-  "version": "0.2.0",
-  "description": "PC 간 클립보드와 최대 500MB 이미지·파일을 공유하는 데스크톱 앱",
+  "version": "0.3.0",
+  "description": "복사 기록을 검색하고 재사용하며 텍스트·이미지·500MB 파일 클립보드를 기기 간 동기화하는 데스크톱 매니저",
   "private": true,
   "type": "module",
   "main": "dist/main.cjs",

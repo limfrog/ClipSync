@@ -1,67 +1,66 @@
 <!doctype html>
-<html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" />
-    <title>ClipSync</title>
-    <script type="module" src="./index.ts"></script>
-  </head>
-  <body>
-    <div class="app-shell">
-      <aside class="sidebar">
-        <a class="brand" href="#" aria-label="ClipSync 홈"><span class="brand-icon">C<span>↗</span></span>ClipSync</a>
-        <span class="workspace-label">WORKSPACE</span>
-        <div class="nav-item"><span aria-hidden="true">⇄</span> 클립보드 동기화 <span class="nav-dot"></span></div>
-        <div class="sidebar-bottom"><span class="local-icon">⌘</span><div>내 기기에서 직접<span>텍스트 · 이미지 · 파일</span></div></div>
-      </aside>
-
-      <main>
-        <header><div class="breadcrumb">내 작업 공간 <span>/</span> 클립보드 동기화</div><span class="version">v0.2.0</span></header>
-        <div class="content">
-          <div class="page-heading"><div><div class="eyebrow">COPY HERE. PASTE THERE.</div><h1>클립보드를 하나로.</h1><p>어느 PC에서 복사해도, 다른 PC에서 바로 붙여넣으세요.</p></div><span class="status-badge" id="status" role="status">연결 대기</span></div>
-
-          <section class="session-panel" aria-label="연결 상태">
-            <div class="session-symbol" aria-hidden="true">⇄</div>
-            <div class="session-description"><h2 id="session-title">PC를 연결할 준비가 됐어요</h2><p id="session-detail">한 PC에서 연결을 열고, 다른 PC에서 참여하세요.</p></div>
-            <div class="session-actions" id="session-actions" hidden><button id="pause" class="button secondary">일시정지</button><button id="disconnect" class="button quiet">연결 해제</button></div>
-          </section>
-
-          <div id="error" class="error-message" role="alert" hidden></div>
-          <div id="notice" class="notice-message" role="status" hidden></div>
-
-          <div class="connection-grid" id="connection-grid">
-            <section class="card">
-              <div class="card-topline"><span class="step-number">01</span><span class="card-tag">첫 번째 PC</span></div>
-              <h2>새 연결 열기</h2><p>이 PC를 중심으로 다른 PC들을 연결하세요.<br />참여할 기기에 초대 코드를 전달하면 됩니다.</p>
-              <button id="host" class="button primary full">연결 열기 <span aria-hidden="true">↗</span></button>
-              <div class="card-footnote">같은 Wi-Fi 또는 유선 네트워크가 필요해요.</div>
-            </section>
-            <section class="card">
-              <div class="card-topline"><span class="step-number">02</span><span class="card-tag">참여할 PC</span></div>
-              <h2>기존 연결에 참여</h2><p>다른 PC에서 받은 초대 코드를 붙여넣으세요.<br />연결한 뒤 새로 복사한 텍스트부터 공유돼요.</p>
-              <form id="join-form"><label class="sr-only" for="invitation">초대 코드</label><div class="join-row"><input id="invitation" type="text" placeholder="초대 코드 붙여넣기" autocomplete="off" spellcheck="false" required maxlength="512" /><button id="join" class="button secondary" type="submit">참여</button></div></form>
-              <div class="card-footnote">초대 코드는 연결을 연 PC에서 복사할 수 있어요.</div>
-            </section>
-          </div>
-
-          <section class="invitation-panel card" id="invitation-panel" hidden>
-            <div><span class="eyebrow">INVITE YOUR DEVICES</span><h2>다른 PC와 연결하세요</h2><p>초대 코드를 받은 기기가 클립보드 연결에 참여할 수 있습니다.</p></div>
-            <button id="copy-invitation" class="button primary">초대 코드 복사 <span aria-hidden="true">↗</span></button>
-          </section>
-
-          <section class="card file-panel" aria-label="이미지와 파일 전송">
-            <div class="file-panel-heading"><div><span class="eyebrow">SEND TO YOUR DEVICES</span><h2>이미지와 파일 주고받기</h2><p>프로그램·사진 등 파일당 최대 500MB. 받을 PC가 수락하면 전송합니다.</p></div></div>
-            <div class="file-controls"><label for="recipient">받을 PC</label><select id="recipient" aria-label="받을 PC"><option value="">연결된 PC가 없습니다</option></select><button id="send-file" class="button primary">파일 보내기</button><button id="send-image" class="button secondary">클립보드 이미지 보내기</button></div>
-            <div class="card-footnote">한글 파일명을 유지하며, 받은 프로그램은 자동으로 실행하지 않습니다. 폴더·macOS .app은 ZIP으로 보내세요.</div>
-            <div id="transfer-list" class="transfer-list" aria-label="파일 전송 목록"><p class="empty-transfers">아직 주고받은 파일이 없습니다.</p></div>
-          </section>
-
-          <section class="stats" aria-label="동기화 활동"><div><span class="stat-label">연결된 PC</span><div><strong id="peer-count">0</strong><span>대</span></div></div><div><span class="stat-label">보낸 클립보드</span><div><strong id="sent-count">0</strong><span>개</span></div></div><div><span class="stat-label">받은 클립보드</span><div><strong id="received-count">0</strong><span>개</span></div></div><div><span class="stat-label">최근 동기화</span><div class="last-activity" id="last-activity">아직 없어요</div></div></section>
-
-          <footer><span class="privacy-dot"></span><span>텍스트·이미지·파일을 암호화해 전송합니다. 수신 파일은 선택한 위치에 저장됩니다.</span><span class="footer-limit">파일 최대 500MB</span></footer>
-        </div>
-      </main>
+<html lang="ko" data-theme="system">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+  <title>ClipSync</title>
+  <script type="module" src="./index.ts"></script>
+</head>
+<body>
+  <header class="header">
+    <div class="header-top">
+      <div class="brand"><span class="logo-mark" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="7.5" y="2.5" width="13.5" height="14.5" rx="3" fill="#186a70" fill-opacity=".55" stroke="#77b7ba" stroke-width="1.6"/><rect x="3" y="6.5" width="13.5" height="15" rx="3" fill="#101c1d" stroke="#77b7ba" stroke-width="1.8"/><path d="M6.5 12h6.5M6.5 16h4.5" stroke="#8cd1c9" stroke-width="2" stroke-linecap="round"/></svg></span><div><h1>ClipSync</h1><div class="status-badge" id="status" role="status">연결 대기</div></div></div>
+      <div class="toolbar">
+        <button id="open-connection" class="icon-btn" title="기기 연결"><span aria-hidden="true">⇄</span> 기기 연결</button>
+        <button id="pin-window" class="icon-btn only-icon" aria-label="창 항상 위에 고정" aria-pressed="false" title="창 항상 위에 고정"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5M5 17h14l-1-3-3-2V6h1V3H8v3h1v6l-3 2-1 3Z"/></svg></button>
+        <button id="open-settings" class="icon-btn only-icon" aria-label="환경설정" title="환경설정"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="m9 3-1 3-3 1-2 3 2 2-1 3 3 2 1 3h4l1-3 3-1 2-3-2-2 1-3-3-2-1-3Z"/></svg></button>
+        <button id="hide-window" class="icon-btn only-icon" aria-label="창 숨기기" title="창 숨기기 · Esc"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      </div>
     </div>
-  </body>
+    <div id="devices" class="devices-bar"><span class="device-chip">이 PC</span><span class="device-hint">기기 연결에서 다른 PC를 추가하세요</span></div>
+  </header>
+
+  <div class="controls">
+    <label class="search-wrap"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7"/><path d="m16 16 5 5"/></svg><input id="search" type="search" placeholder="클립보드 히스토리 검색..." aria-label="클립보드 히스토리 검색" autocomplete="off" /></label>
+    <div class="segmented-tabs" role="tablist" aria-label="기록 유형">
+      <button class="seg-tab" role="tab" data-filter="all" aria-selected="true">전체</button><button class="seg-tab" role="tab" data-filter="text" aria-selected="false">텍스트·링크</button><button class="seg-tab" role="tab" data-filter="image" aria-selected="false">이미지</button><button class="seg-tab" role="tab" data-filter="file" aria-selected="false">파일</button><button class="seg-tab" role="tab" data-filter="pinned" aria-selected="false">고정됨</button>
+    </div>
+    <div class="manager-hint">복사하면 기록됩니다. 연결된 기기에서도 그대로 붙여넣으세요.</div>
+  </div>
+  <div id="error" class="error-message" role="alert" hidden></div>
+  <main class="history-container" aria-label="클립보드 기록">
+    <section id="transfer-list" aria-label="진행 중인 파일 전송"></section>
+    <section id="history-list" aria-label="클립보드 히스토리"></section>
+  </main>
+  <footer class="footer"><span id="shortcut" class="kbd-tag">Ctrl + Shift + V</span><div class="footer-actions"><button id="open-downloads" class="footer-btn">수신 폴더</button><button id="clear-history" class="footer-btn" title="고정 항목을 남기고 기록 비우기">비우기</button><button id="quit" class="footer-btn danger">종료</button></div></footer>
+  <div id="notice" class="toast" role="status" hidden></div>
+
+  <dialog id="connection-dialog" aria-labelledby="connection-title">
+    <div class="modal-head"><h2 id="connection-title">기기 연결</h2><button class="icon-btn only-icon" data-close="connection-dialog" aria-label="기기 연결 닫기"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+    <div id="connection-error" class="error-message" role="alert" hidden></div>
+    <p class="modal-description">연결된 기기와 새로 복사한 텍스트·이미지·파일을 자동으로 동기화합니다. 신뢰하는 기기만 연결하세요.</p>
+    <div id="connection-grid">
+      <section class="section-card"><h3>첫 번째 PC</h3><p>이 PC에서 연결을 열어 다른 PC를 초대하세요.</p><button id="host" class="button primary full">연결 열기</button></section>
+      <section class="section-card"><h3>참여할 PC</h3><form id="join-form"><label for="invitation">초대 코드</label><input id="invitation" type="text" placeholder="clipsync://…" autocomplete="off" spellcheck="false" required maxlength="512" /><button id="join" class="button secondary full" type="submit">참여</button></form></section>
+    </div>
+    <section id="invitation-panel" class="section-card" hidden><h3>다른 PC 초대</h3><p>초대 코드에는 연결 권한이 포함됩니다. 신뢰하는 PC에만 전달하세요.</p><button id="copy-invitation" class="button primary full">초대 코드 복사</button></section>
+    <div id="session-actions" hidden><p id="session-title"></p><div class="action-row"><button id="pause" class="button secondary">일시정지</button><button id="disconnect" class="button quiet">연결 해제</button></div></div>
+    <div class="connection-stats"><span>연결 <b id="peer-count">0</b>대</span><span>보냄 <b id="sent-count">0</b>개</span><span>받음 <b id="received-count">0</b>개</span></div>
+    <p class="small-note">이미지·프로그램·파일당 최대 500MB · 한글 파일명 보존</p>
+  </dialog>
+
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <div class="modal-head"><h2 id="settings-title">환경설정</h2><button class="icon-btn only-icon" data-close="settings-dialog" aria-label="환경설정 닫기"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+    <div id="settings-error" class="error-message" role="alert" hidden></div>
+    <form id="settings-form">
+      <label for="theme">화면 테마</label><select id="theme"><option value="dark">다크</option><option value="light">라이트</option><option value="system">시스템 설정</option></select>
+      <label for="shortcut-setting">창 열기·숨기기 단축키</label><input id="shortcut-setting" type="text" placeholder="CommandOrControl+Shift+V" maxlength="80" autocomplete="off" spellcheck="false" /><p class="small-note">Ctrl/Command, Alt, Shift와 영문자·숫자를 조합하세요.</p>
+      <label class="checkbox-row"><input id="always-on-top" type="checkbox" /> 창 항상 위에 고정</label>
+      <section class="section-card"><h3>클립보드 기록</h3><p>앱을 켜둔 동안 최대 100개를 보관합니다. 이미지는 미리보기로, 파일은 원본 참조로 관리합니다. 종료하면 기록은 사라지며, 동기화한 파일은 다운로드 폴더의 ClipSync에 남습니다. 창을 숨겨도 동기화는 계속됩니다.</p></section>
+      <button class="button primary full" type="submit">설정 저장</button>
+    </form>
+    <div class="settings-build-bar"><span>ClipSync · 클립보드 매니저</span><span>텍스트 · 이미지 · 파일</span></div>
+  </dialog>
+</body>
 </html>

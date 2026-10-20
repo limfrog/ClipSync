@@ -2,7 +2,7 @@ import { createHash, randomUUID, type Hash } from 'node:crypto';
 import { constants, createReadStream } from 'node:fs';
 import { copyFile, link, open, stat as fileStat, unlink, type FileHandle } from 'node:fs/promises';
 import path from 'node:path';
-import { CHUNK_BYTES, MAX_FILE_BYTES, type TransferPacket, type TransferState } from '../shared/transfers';
+import { CHUNK_BYTES, MAX_FILE_BYTES, type ClipboardBatch, type TransferPacket, type TransferState } from '../shared/transfers';
 import { numberedFilename, portableFilename } from './file-names';
 
 interface Entry {
@@ -59,7 +59,7 @@ export class TransferManager {
     this.changed(this.states());
   }
 
-  async offer(file: string, peerId: string, image = false, temporary = false) {
+  async offer(file: string, peerId: string, image = false, temporary = false, clipboard?: ClipboardBatch, stillCurrent?: () => boolean) {
     if (this.closed) throw new Error('먼저 PC를 연결해 주세요.');
     if ([...this.entries.values()].filter(e => e.state.direction === 'send' && !terminal(e.state)).length >= 4) throw new Error('한 번에 파일 4개까지 보낼 수 있습니다.');
     // Windows rejects opening a directory before fstat; validate it portably first.
@@ -77,15 +77,16 @@ export class TransferManager {
       }
       if (this.closed) throw new Error('연결이 해제됐습니다.');
       const after = await handle.stat();
+      if (stillCurrent && !stillCurrent()) throw new Error('더 새로운 클립보드가 있어 이전 동기화를 건너뛰었습니다.');
       if (after.size !== stat.size || after.mtimeMs !== stat.mtimeMs) throw new Error('파일이 변경됐습니다. 저장을 마친 뒤 다시 보내 주세요.');
       const entry: Entry = {
-        state: { id: randomUUID(), peerId, name: portableFilename(path.basename(file)), size: stat.size, bytes: 0, image, direction: 'send', status: 'offered', error: null },
+        state: { id: randomUUID(), peerId, name: portableFilename(path.basename(file)), size: stat.size, bytes: 0, image, direction: 'send', status: 'offered', error: null, ...(clipboard ? { clipboard } : {}) },
         sha256: hash.digest('hex'), source: file, handle, temporary, lastAt: Date.now(),
       };
       this.entries.set(entry.state.id, entry);
       retained = true;
       try {
-        this.send({ type: 'offer', transferId: entry.state.id, name: entry.state.name, size: stat.size, sha256: entry.sha256, image }, peerId);
+        this.send({ type: 'offer', transferId: entry.state.id, name: entry.state.name, size: stat.size, sha256: entry.sha256, image, ...(clipboard ? { clipboard } : {}) }, peerId);
       } catch (error) { await this.fail(entry, error); throw error; }
       this.emit();
       return entry.state.id;
@@ -127,7 +128,7 @@ export class TransferManager {
           return;
         }
         this.entries.set(packet.transferId, {
-          state: { id: packet.transferId, direction: 'receive', peerId: from, name: portableFilename(packet.name), size: packet.size, bytes: 0, image: packet.image, status: 'offered', error: null },
+          state: { id: packet.transferId, direction: 'receive', peerId: from, name: portableFilename(packet.name), size: packet.size, bytes: 0, image: packet.image, status: 'offered', error: null, ...(packet.clipboard ? { clipboard: packet.clipboard } : {}) },
           sha256: packet.sha256, lastAt: Date.now(),
         });
         this.emit();
@@ -230,11 +231,11 @@ export class TransferManager {
     this.emit();
   }
 
-  async cancel(id: string) {
+  async cancel(id: string, reason = '사용자가 전송을 취소했습니다.') {
     const entry = this.entries.get(id);
     if (!entry || terminal(entry.state)) return;
-    try { this.send({ type: 'cancel', transferId: id, reason: '사용자가 전송을 취소했습니다.' }, entry.state.peerId); } catch { /* disconnected */ }
-    this.receive({ type: 'cancel', transferId: id, reason: '사용자가 전송을 취소했습니다.' }, entry.state.peerId);
+    try { this.send({ type: 'cancel', transferId: id, reason }, entry.state.peerId); } catch { /* disconnected */ }
+    this.receive({ type: 'cancel', transferId: id, reason }, entry.state.peerId);
     await this.queue;
   }
 

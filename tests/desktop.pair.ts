@@ -5,6 +5,7 @@ import { createReadStream } from 'node:fs';
 import { mkdir, mkdtemp, open, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { test } from 'node:test';
 import { setTimeout } from 'node:timers/promises';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
@@ -54,6 +55,7 @@ async function editor(desktop: Desktop) {
     editor.id = 'verification-editor';
     editor.setAttribute('aria-label', '검증용 편집기');
     editor.rows = 3;
+    editor.style.cssText = 'position:fixed;bottom:55px;left:12px;width:370px;z-index:5';
     document.body.append(editor);
   });
   return desktop.page.getByRole('textbox', { name: '검증용 편집기' });
@@ -131,8 +133,8 @@ test('two packaged desktops with independent OS clipboards', { timeout: 240000 }
     app.on('close', () => { running.closed = true; });
     const page = await app.firstWindow();
     page.on('pageerror', error => rendererErrors.push(error.message));
-    await page.getByRole('heading', { name: '클립보드를 하나로.' }).waitFor();
-    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1080, 880));
+    await page.getByRole('heading', { name: 'ClipSync', exact: true }).waitFor();
+    await page.getByRole('button', { name: '창 항상 위에 고정', exact: true }).click();
     const desktop = { app, page, display: display.display, profile };
     return desktop;
   }
@@ -167,10 +169,13 @@ test('two packaged desktops with independent OS clipboards', { timeout: 240000 }
   });
 
   await check('UI rejects malformed invitations and wrong keys, then joins with the original host invitation', async () => {
+    await host.page.getByRole('button', { name: '기기 연결', exact: true }).click();
     await host.page.getByRole('button', { name: '연결 열기' }).click();
     await until(async () => (await state(host)).mode === 'hosting');
     await host.page.getByRole('button', { name: '초대 코드 복사' }).click();
     invitation = await clipboard(host);
+    await host.page.getByRole('button', { name: '기기 연결 닫기', exact: true }).click();
+    await client.page.getByRole('button', { name: '기기 연결', exact: true }).click();
     assert.ok(invitation.startsWith('clipsync://join?'), 'Copy invitation did not write a valid code');
     const input = client.page.getByRole('textbox', { name: '초대 코드', exact: true });
     const join = client.page.getByRole('button', { name: '참여', exact: true });
@@ -218,7 +223,9 @@ test('two packaged desktops with independent OS clipboards', { timeout: 240000 }
   });
 
   await check('pause blocks sending and receiving; resume does not leak paused copies', async () => {
+    await client.page.getByRole('button', { name: '기기 연결', exact: true }).click();
     await client.page.getByRole('button', { name: '일시정지', exact: true }).click();
+    await client.page.getByRole('button', { name: '기기 연결 닫기', exact: true }).click();
     await until(async () => (await state(client)).paused);
     const previousHost = await clipboard(host);
     await copy(client, 'private copy while paused');
@@ -227,7 +234,9 @@ test('two packaged desktops with independent OS clipboards', { timeout: 240000 }
     await copy(host, 'host update while client is paused');
     await setTimeout(900);
     assert.ok(await clipboard(client) === 'private copy while paused', 'Paused client applied incoming clipboard content');
+    await client.page.getByRole('button', { name: '기기 연결', exact: true }).click();
     await client.page.getByRole('button', { name: '동기화 재개' }).click();
+    await client.page.getByRole('button', { name: '기기 연결 닫기', exact: true }).click();
     await until(async () => !(await state(client)).paused);
     await setTimeout(900);
     assert.ok(await clipboard(host) === 'host update while client is paused', 'Resume leaked an old private copy');
@@ -235,18 +244,17 @@ test('two packaged desktops with independent OS clipboards', { timeout: 240000 }
     await until(async () => await clipboard(host) === 'new copy after resuming');
   });
 
-  await check('a real image clipboard is ignored and subsequent text still syncs', async () => {
+  await check('copying an image automatically synchronizes the real image clipboard without text loops', async () => {
     const before = (await state(host)).sent;
-    const existing = await clipboard(client);
     await host.app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
       const png = nativeImage.createFromBitmap(Buffer.from([255, 255, 255, 255]), { width: 1, height: 1 }).toPNG();
       await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(png)], { type: 'image/png' }) })]);
     });
-    assert.equal(await host.app.evaluate(({ clipboard }) => clipboard.has('image/png')), true);
-    assert.equal(await host.app.evaluate(({ clipboard }) => clipboard.has('text/plain')), false);
+    await until(async () => await client.app.evaluate(({ clipboard }) => clipboard.has('image/png')), 'Image did not automatically enter the peer clipboard', 10000);
     await setTimeout(900);
     assert.equal((await state(host)).sent, before);
-    assert.ok(await clipboard(client) === existing, 'Image copy cleared the peer text clipboard');
+    assert.equal((await state(host)).transfers.filter(t => t.clipboard).length, 1);
+    assert.equal((await state(client)).transfers.filter(t => t.clipboard).length, 1);
     await copy(host, 'text after image');
     await until(async () => await clipboard(client) === 'text after image');
   });
@@ -286,40 +294,43 @@ test('two packaged desktops with independent OS clipboards', { timeout: 240000 }
     assert.deepEqual(after.map(({ sent, received }) => ({ sent, received })), before.map(({ sent, received }) => ({ sent, received })));
   });
 
-  await check('UI sends a program with a decomposed Korean name and preserves its exact bytes', async () => {
+  await check('copying a program synchronizes Korean filename and bytes and exposes a native file clipboard', async () => {
     const source = path.join(host.profile, '한글 설치 프로그램.exe'.normalize('NFD'));
     const data = Buffer.concat([Buffer.from('MZ\0프로그램\0'), randomBytes(700_000)]);
     await writeFile(source, data);
-    const destination = path.join(client.profile, '한글 설치 프로그램.exe');
-    await host.app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }); }, source);
-    await client.app.evaluate(({ dialog }, file) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath: file }); }, destination);
-    await host.page.getByRole('button', { name: '파일 보내기', exact: true }).click();
-    await until(async () => (await state(client)).transfers.some(t => t.status === 'offered'), 'File offer did not reach the other desktop');
-    assert.equal((await state(client)).transfers.find(t => t.status === 'offered')?.name, '한글 설치 프로그램.exe');
-    await client.page.getByRole('button', { name: '받기', exact: true }).click();
-    await until(async () => (await state(client)).transfers.some(t => t.status === 'completed' && t.name === '한글 설치 프로그램.exe'), 'Program transfer did not finish', 10000);
-    assert.ok((await readFile(destination)).equals(data), 'Received program bytes differ from the source');
+    const destination = path.join(client.profile, 'ClipSync', '한글 설치 프로그램.exe');
+    await host.app.evaluate(async ({ clipboard, ClipboardItem }, uri) => {
+      await clipboard.write([new ClipboardItem({ 'text/uri-list': uri })]);
+    }, pathToFileURL(source).href);
+    await until(async () => (await state(client)).transfers.some(t => t.status === 'completed' && t.name === '한글 설치 프로그램.exe'), 'Program clipboard did not sync', 15000);
+    assert.ok((await readFile(destination)).equals(data), 'Received program bytes differ');
+    const uris = await client.app.evaluate(async ({ clipboard }) => {
+      const item = (await clipboard.read()).find(item => item.types.includes('text/uri-list'));
+      return item ? (await item.getType('text/uri-list')).text() : '';
+    });
+    await until(async () => await client.app.evaluate(({ clipboard }) => clipboard.has('text/uri-list')), 'File clipboard was not prepared');
+    const actual = await client.app.evaluate(async ({ clipboard }) => {
+      const item = (await clipboard.read()).find(item => item.types.includes('text/uri-list'))!;
+      return (await item.getType('text/uri-list')).text();
+    });
+    assert.equal(fileURLToPath(actual.trim()), destination);
+    assert.ok(uris === '' || uris.includes('file:'), 'Invalid native file reference');
   });
 
-  await check('clipboard image travels to the other app and can be copied into its native clipboard', async () => {
+  await check('image clipboard synchronization preserves pixels and creates a reusable image history record', async () => {
     await host.app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
       const png = nativeImage.createFromBitmap(Buffer.from([10, 100, 240, 255]), { width: 1, height: 1 }).toPNG();
       await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(png)], { type: 'image/png' }) })]);
     });
-    const destination = path.join(client.profile, '받은 한글 이미지.png');
-    await client.app.evaluate(({ dialog }, file) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath: file }); }, destination);
-    await host.page.getByRole('button', { name: '클립보드 이미지 보내기', exact: true }).click();
-    await until(async () => (await state(client)).transfers.some(t => t.image && t.status === 'offered'));
-    await client.page.getByRole('button', { name: '받기', exact: true }).click();
-    await until(async () => (await state(client)).transfers.some(t => t.image && t.status === 'completed'));
-    await client.page.getByRole('button', { name: '이미지 복사', exact: true }).click();
-    await until(async () => await client.app.evaluate(({ clipboard }) => clipboard.has('image/png')));
-    const dimensions = await client.app.evaluate(async ({ clipboard, nativeImage }) => {
-      const item = (await clipboard.read()).find(item => item.types.includes('image/png'))!;
+    await until(async () => await client.app.evaluate(async ({ clipboard, nativeImage }) => {
+      const item = (await clipboard.read()).find(item => item.types.includes('image/png'));
+      if (!item) return false;
       const image = nativeImage.createFromBuffer(Buffer.from(await (await item.getType('image/png')).arrayBuffer()));
-      return image.getSize();
-    });
-    assert.deepEqual(dimensions, { width: 1, height: 1 });
+      return image.getSize().width === 1 && image.toBitmap()[0] === 10 && image.toBitmap()[1] === 100;
+    }), 'PNG pixels did not synchronize automatically', 10000);
+    await until(async () => (await state(client)).history.some(item => item.type === 'image' && item.mediaId));
+    const item = (await state(client)).history.find(item => item.type === 'image')!;
+    assert.ok(item.thumbnail?.startsWith('data:image/png;'));
   });
 
   await check('two packaged apps exchange a full 500MB program with a Korean filename and matching SHA-256', async () => {
@@ -331,12 +342,10 @@ test('two packaged desktops with independent OS clipboards', { timeout: 240000 }
     const tail = Buffer.from('프로그램 마지막 데이터 👋');
     await handle.write(tail, 0, tail.length, 500_000_000 - tail.length);
     await handle.close();
-    const destination = path.join(client.profile, '한글 대용량 프로그램.exe');
-    await host.app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }); }, source);
-    await client.app.evaluate(({ dialog }, file) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath: file }); }, destination);
-    await host.page.getByRole('button', { name: '파일 보내기', exact: true }).click();
-    await until(async () => (await state(client)).transfers.some(t => t.size === 500_000_000 && t.status === 'offered'), '500MB offer did not arrive', 10000);
-    await client.page.getByRole('button', { name: '받기', exact: true }).click();
+    const destination = path.join(client.profile, 'ClipSync', '한글 대용량 프로그램.exe');
+    await host.app.evaluate(async ({ clipboard, ClipboardItem }, uri) => {
+      await clipboard.write([new ClipboardItem({ 'text/uri-list': uri })]);
+    }, pathToFileURL(source).href);
     await until(async () => (await state(client)).transfers.some(t => t.size === 500_000_000 && t.status === 'completed') && (await state(host)).transfers.some(t => t.size === 500_000_000 && t.status === 'completed'), '500MB desktop transfer did not complete', 170000);
     assert.equal((await stat(destination)).size, 500_000_000);
     assert.equal(await digest(source), await digest(destination));
@@ -345,15 +354,19 @@ test('two packaged desktops with independent OS clipboards', { timeout: 240000 }
   });
 
   await check('disconnect stops sharing, a new session rejects the old code, and reconnect restores sync', async () => {
+    await client.page.getByRole('button', { name: '기기 연결', exact: true }).click();
     await client.page.getByRole('button', { name: '연결 해제' }).click();
+    await client.page.getByRole('button', { name: '기기 연결 닫기', exact: true }).click();
     await until(async () => (await state(host)).peers === 0 && (await state(client)).mode === 'idle');
     const existing = await clipboard(client);
     await copy(host, 'copy after peer disconnected');
     await setTimeout(900);
     assert.ok(await clipboard(client) === existing, 'Disconnected peer still received clipboard data');
+    await host.page.getByRole('button', { name: '기기 연결', exact: true }).click();
     await host.page.getByRole('button', { name: '연결 해제' }).click();
     await host.page.getByRole('button', { name: '연결 열기' }).click();
     await until(async () => (await state(host)).mode === 'hosting');
+    await client.page.getByRole('button', { name: '기기 연결', exact: true }).click();
     const input = client.page.getByRole('textbox', { name: '초대 코드', exact: true });
     const join = client.page.getByRole('button', { name: '참여', exact: true });
     await input.fill(invitation);
@@ -362,6 +375,7 @@ test('two packaged desktops with independent OS clipboards', { timeout: 240000 }
     assert.equal((await state(client)).mode, 'idle');
     await host.page.getByRole('button', { name: '초대 코드 복사' }).click();
     const fresh = await clipboard(host);
+    await host.page.getByRole('button', { name: '기기 연결 닫기', exact: true }).click();
     assert.ok(fresh !== invitation, 'Session key was not rotated');
     await input.fill(fresh);
     await join.click();

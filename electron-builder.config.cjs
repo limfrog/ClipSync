@@ -2,7 +2,7 @@ module.exports = {
   appId: 'dev.limfrog.clipsync',
   productName: 'ClipSync',
   directories: { output: 'release/installers' },
-  files: ['dist/**/*', 'package.json'],
+  files: ['dist/**/*', 'package.json', 'THIRD_PARTY_NOTICES.txt'],
   asar: true,
   npmRebuild: false,
   publish: null,

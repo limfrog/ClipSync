@@ -1,25 +1,98 @@
-import { app, BrowserWindow, clipboard, ClipboardItem, dialog, ipcMain, Menu, shell } from 'electron';
+import { app, BrowserWindow, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, nativeImage, screen, shell, Tray } from 'electron';
 import path from 'node:path';
 import { createWriteStream, openAsBlob } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { SyncController } from './controller';
 import type { Result } from '../shared/api';
 import { MAX_FILE_BYTES } from '../shared/transfers';
+import { DEFAULT_PREFERENCES, type Preferences } from '../shared/history';
+import { NativeMediaClipboard } from './clipboard-media';
+import { MediaSync } from './media-sync';
 
 let window: BrowserWindow | null = null;
 let controller: SyncController;
 let quitting = false;
 let imageCache: string;
+let tray: Tray | null = null;
+let preferences = { ...DEFAULT_PREFERENCES };
+let nativeDialogDepth = 0;
+let media: MediaSync | undefined;
+let lastHistorySent = -1;
+let settingsQueue = Promise.resolve();
+const imageCachePath = async () => imageCache ??= await mkdtemp(path.join(app.getPath('temp'), 'clipsync-images-'));
+
+function validatePreferences(value: unknown): Preferences {
+  if (!value || typeof value !== 'object') throw new Error('설정을 확인해 주세요.');
+  const p = value as Preferences;
+  if (!['system', 'dark', 'light'].includes(p.theme) || typeof p.alwaysOnTop !== 'boolean' ||
+      typeof p.shortcut !== 'string' || p.shortcut.length > 80 || !/^(?=.*(?:Control|Ctrl|Command|Cmd|Alt|Option)).+\+[A-Z0-9]$/i.test(p.shortcut)) {
+    throw new Error('테마와 단축키 설정을 확인해 주세요.');
+  }
+  return { theme: p.theme, alwaysOnTop: p.alwaysOnTop, shortcut: p.shortcut };
+}
+
+const preferencesPath = () => path.join(app.getPath('userData'), 'preferences.json');
+const currentPreferences = () => ({ ...preferences, shortcutAvailable: globalShortcut.isRegistered(preferences.shortcut) });
+
+function toggleWindow() {
+  if (!window || window.isDestroyed()) createWindow();
+  else if (window.isVisible() && window.isFocused()) window.hide();
+  else { window.show(); window.focus(); }
+}
+
+function createTray() {
+  const bitmap = Buffer.alloc(32 * 32 * 4);
+  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+    const outline = x >= 6 && x <= 25 && y >= 7 && y <= 28 && (x < 9 || x > 22 || y < 10 || y > 25);
+    const clip = x >= 12 && x <= 20 && y >= 4 && y <= 9;
+    const line = x >= 11 && x <= 20 && (y === 15 || y === 20);
+    if (outline || clip || line) bitmap.set(process.platform === 'darwin' ? [0, 0, 0, 255] : [184, 169, 44, 255], (y * 32 + x) * 4);
+  }
+  const icon = nativeImage.createFromBitmap(bitmap, { width: 32, height: 32 }).resize({ width: 18, height: 18 });
+  icon.setTemplateImage(process.platform === 'darwin');
+  try {
+    tray = new Tray(icon);
+    tray.setToolTip('ClipSync · 클립보드와 파일 동기화');
+    tray.setContextMenu(Menu.buildFromTemplate([
+      { label: 'ClipSync 열기', click: () => { if (!window) createWindow(); window?.show(); window?.focus(); } },
+      { type: 'separator' }, { label: '종료', click: () => app.quit() },
+    ]));
+    tray.on('click', toggleWindow);
+  } catch (error) { console.warn('Tray unavailable:', error instanceof Error ? error.message : error); }
+}
+
+async function configure(value: unknown) {
+  const next = validatePreferences(value);
+  const newShortcut = next.shortcut !== preferences.shortcut || !globalShortcut.isRegistered(next.shortcut);
+  if (newShortcut && !globalShortcut.register(next.shortcut, toggleWindow)) throw new Error('다른 앱이 사용 중인 단축키입니다. 다른 조합을 선택해 주세요.');
+  try {
+    await mkdir(app.getPath('userData'), { recursive: true });
+    await writeFile(`${preferencesPath()}.tmp`, JSON.stringify(next), { mode: 0o600 });
+    await rename(`${preferencesPath()}.tmp`, preferencesPath());
+  } catch (error) { if (newShortcut) globalShortcut.unregister(next.shortcut); throw error; }
+  if (next.shortcut !== preferences.shortcut) globalShortcut.unregister(preferences.shortcut);
+  preferences = next;
+  window?.setAlwaysOnTop(next.alwaysOnTop);
+  window?.webContents.send('clipsync:preferences', currentPreferences());
+}
+
+async function nativeDialog<T>(action: () => Promise<T>) {
+  nativeDialogDepth++;
+  try { return await action(); } finally { nativeDialogDepth--; }
+}
 
 // Tests isolate app data; normal desktops use Electron's standard per-user path.
 if (process.env.CLIPSYNC_DATA_DIR) app.setPath('userData', process.env.CLIPSYNC_DATA_DIR);
 
 function createWindow() {
+  lastHistorySent = -1;
   window = new BrowserWindow({
-    width: 1080, height: 780, minWidth: 760, minHeight: 650,
-    title: 'ClipSync', backgroundColor: '#101615',
+    width: 400, height: Math.min(760, screen.getPrimaryDisplay().workArea.height - 30),
+    minWidth: 380, minHeight: 500, frame: false, resizable: false, fullscreenable: false,
+    alwaysOnTop: preferences.alwaysOnTop, skipTaskbar: Boolean(tray),
+    title: 'ClipSync', backgroundColor: '#09090b',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true, nodeIntegration: false, sandbox: true,
@@ -29,29 +102,56 @@ function createWindow() {
   window.webContents.on('will-navigate', event => event.preventDefault());
   window.webContents.on('will-attach-webview', event => event.preventDefault());
   void window.loadFile(path.join(__dirname, 'renderer/index.html'));
+  window.on('close', event => { if (!quitting && tray) { event.preventDefault(); window?.hide(); } });
+  window.on('blur', () => {
+    if (tray && !preferences.alwaysOnTop && !nativeDialogDepth && !window?.webContents.isDevToolsOpened()) window?.hide();
+  });
   window.on('closed', () => { window = null; });
 }
 
-void app.whenReady().then(() => {
+void app.whenReady().then(async () => {
+  try { preferences = validatePreferences(JSON.parse(await readFile(preferencesPath(), 'utf8'))); }
+  catch { preferences = { ...DEFAULT_PREFERENCES }; }
   Menu.setApplicationMenu(process.platform === 'darwin' ? Menu.buildFromTemplate([
     { role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' },
   ]) : Menu.buildFromTemplate([{ role: 'editMenu' }, { role: 'windowMenu' }]));
 
   controller = new SyncController({
-    readText: async () => await clipboard.has('text/plain') ? clipboard.readText() : null,
+    readText: async () => await clipboard.has('text/uri-list') || await clipboard.has('image/png') ? null : await clipboard.has('text/plain') ? clipboard.readText() : null,
     writeText: text => clipboard.writeText(text),
   }, state => {
-    if (window && !window.isDestroyed()) window.webContents.send('clipsync:state', state);
+    if (window && !window.isDestroyed()) {
+      // Media progress does not resend all image previews ten times per second.
+      window.webContents.send('clipsync:state', { ...state, history: state.historyRevision === lastHistorySent ? undefined : state.history });
+      lastHistorySent = state.historyRevision;
+    }
+    media?.observe(state);
   });
+  media = new MediaSync(controller, new NativeMediaClipboard(imageCachePath), path.join(process.env.CLIPSYNC_DATA_DIR ?? app.getPath('downloads'), 'ClipSync'));
   ipcMain.handle('clipsync:get-state', () => controller.state());
+  ipcMain.handle('clipsync:preferences', () => currentPreferences());
   const actions: Record<string, (...args: never[]) => unknown> = {
+    configure: (value: unknown) => {
+      const work = settingsQueue.then(() => configure(value));
+      settingsQueue = work.catch(() => {});
+      return work;
+    },
+    history: (action: string, id?: string) => action === 'copy' && controller.state().history.some(item => item.id === id && item.mediaId) ? media!.copy(id!) : controller.manageHistory(action, id),
+    hide: () => { if (tray) window?.hide(); else window?.minimize(); },
+    quit: () => { setImmediate(() => app.quit()); },
+    'open-downloads': async () => {
+      const folder = path.join(process.env.CLIPSYNC_DATA_DIR ?? app.getPath('downloads'), 'ClipSync');
+      await mkdir(folder, { recursive: true });
+      const error = await shell.openPath(folder);
+      if (error) throw new Error(error);
+    },
     host: () => controller.host(),
     join: (code: string) => controller.join(code),
     disconnect: () => controller.disconnect(),
     pause: (paused: boolean) => controller.pause(paused),
     'copy-invitation': () => controller.copyInvitation(),
     'choose-file': async (peerId: string) => {
-      const result = await dialog.showOpenDialog(window!, { title: '보낼 파일 선택 · 최대 500MB', properties: ['openFile'] });
+      const result = await nativeDialog(() => dialog.showOpenDialog(window!, { title: '보낼 파일 선택 · 최대 500MB', properties: ['openFile'] }));
       if (!result.canceled && result.filePaths[0]) await controller.sendFile(result.filePaths[0], peerId);
     },
     'send-image': async (peerId: string) => {
@@ -70,7 +170,7 @@ void app.whenReady().then(() => {
     'accept-transfer': async (id: string) => {
       const transfer = controller.state().transfers.find(t => t.id === id && t.direction === 'receive' && t.status === 'offered');
       if (!transfer) throw new Error('수신 대기 중인 파일이 아닙니다.');
-      const result = await dialog.showSaveDialog(window!, { title: '파일을 받을 위치 선택', defaultPath: path.join(app.getPath('downloads'), transfer.name), buttonLabel: '여기에 받기' });
+      const result = await nativeDialog(() => dialog.showSaveDialog(window!, { title: '파일을 받을 위치 선택', defaultPath: path.join(app.getPath('downloads'), transfer.name), buttonLabel: '여기에 받기' }));
       if (!result.canceled && result.filePath) await controller.acceptTransfer(id, result.filePath);
     },
     'cancel-transfer': (id: string) => controller.cancelTransfer(id),
@@ -83,25 +183,31 @@ void app.whenReady().then(() => {
     },
   };
   for (const [name, action] of Object.entries(actions)) {
-    ipcMain.handle(`clipsync:${name}`, async (_event, ...args): Promise<Result> => {
+    ipcMain.handle(`clipsync:${name}`, async (event, ...args): Promise<Result> => {
+      if (!window || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame) return { ok: false, error: '허용되지 않은 창입니다.' };
       try { await action(...args as never[]); return { ok: true }; }
       catch (error) { return { ok: false, error: error instanceof Error ? error.message : '요청을 처리할 수 없습니다.' }; }
     });
   }
+  createTray();
+  globalShortcut.register(preferences.shortcut, toggleWindow);
   createWindow();
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+  app.on('activate', () => { if (!window) createWindow(); window?.show(); window?.focus(); });
 });
 
 app.on('window-all-closed', () => {
-  // Closing the app stops clipboard sharing on every platform.
-  app.quit();
+  if (!tray) app.quit();
 });
 
 app.on('before-quit', event => {
   if (quitting || !controller) return;
   event.preventDefault();
   quitting = true;
+  globalShortcut.unregisterAll();
+  tray?.destroy();
+  tray = null;
   void controller.dispose().finally(async () => {
+    await media?.dispose();
     try { if (imageCache) await rm(imageCache, { recursive: true, force: true }); }
     finally { app.quit(); }
   });
