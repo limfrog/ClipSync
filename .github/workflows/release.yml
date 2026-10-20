@@ -2,19 +2,41 @@ name: Publish installers
 
 on:
   push:
+    branches: [main]
+    paths: ['.github/workflows/release.yml']
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: version
+        shell: bash
+        run: |
+          tag="v$(node -p 'JSON.parse(require("node:fs").readFileSync("package.json")).version')"
+          if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" != "$tag" ]]; then
+            echo 'Tag and package version differ' >&2
+            exit 1
+          fi
+          git rev-parse --verify "$tag^{commit}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
   build:
+    needs: metadata
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
+          - os: ubuntu-latest
             command: dist:win
             artifact: Windows
             files: release/installers/*-Setup.exe
@@ -25,18 +47,38 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.metadata.outputs.tag }}
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
       - name: Check release version
         shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.metadata.outputs.tag }}
         run: |
-          node --input-type=module -e 'import fs from "node:fs"; const v = JSON.parse(fs.readFileSync("package.json")).version; if (process.env.GITHUB_REF_NAME !== `v${v}`) throw new Error("Tag and package version differ")'
+          node --input-type=module -e 'import fs from "node:fs"; const v = JSON.parse(fs.readFileSync("package.json")).version; if (process.env.RELEASE_TAG !== `v${v}`) throw new Error("Tag and package version differ")'
       - run: npm ci
       - run: node node_modules/electron/install.js
       - run: npm test
-      - run: npm run ${{ matrix.command }}
+      - name: Build installer
+        shell: bash
+        run: |
+          set +e
+          npm run ${{ matrix.command }} 2>&1 | tee "$RUNNER_TEMP/installer-build.log"
+          result=${PIPESTATUS[0]}
+          set -e
+          if [[ "$result" != 0 ]]; then
+            python3 - <<'PY'
+          import os
+          from pathlib import Path
+          lines = Path(os.environ['RUNNER_TEMP'], 'installer-build.log').read_text(errors='replace').splitlines()[-35:]
+          message = '\n'.join(lines).replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+          print(f'::error::{message}')
+          PY
+            exit "$result"
+          fi
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: Verify macOS app signatures and packages
@@ -56,12 +98,14 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: build
+    needs: [metadata, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.metadata.outputs.tag }}
       - uses: actions/download-artifact@v4
         with:
           pattern: installers-*
@@ -89,7 +133,7 @@ jobs:
       - name: Publish prerelease
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ needs.metadata.outputs.tag }}
         run: |
           gh release create "$RELEASE_TAG" release-assets/* \
             --repo "$GITHUB_REPOSITORY" --verify-tag --prerelease \
