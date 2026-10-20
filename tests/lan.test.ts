@@ -15,12 +15,14 @@ test('LAN connects without internet discovery, rejects wrong password, reconnect
   const sessions: P2PSession[] = [];
   t.after(async () => { for (const session of sessions) await session.close(); });
   const peers = [0, 0, 0, 0]; const texts: string[][] = [[], [], [], []];
+  const events: string[] = [];
+  t.after(() => t.diagnostic(events.join('; ')));
   const hints: { peers: string[]; nodes: { host: string; port: number }[] }[] = [];
   function start(index: number) {
     const session = groupSession(credentials[index], {
       onText: text => texts[index].push(text), onPeers: count => { peers[index] = count; },
       onDevices: () => {}, onTransfer: () => {}, onStatus: () => {},
-    }, { bootstrap: [], onHints: value => { hints[index] = value; } });
+    }, { bootstrap: [], lanDiagnostic: event => { if (events.length < 80) events.push(`${index}: ${event}`); }, onHints: value => { hints[index] = value; } });
     sessions.push(session); return session;
   }
   const a = start(0); start(3);

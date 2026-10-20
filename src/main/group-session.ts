@@ -17,7 +17,7 @@ interface Callbacks {
   onStatus(status: GroupStatus, error?: string): void;
 }
 interface Member { socket: Duplex; id: string; name: string; rank: string; lastSeen: number }
-export interface P2POptions { bootstrap?: string[]; lan?: boolean; onHints?(hints: { peers: string[]; nodes: { host: string; port: number }[] }): void }
+export interface P2POptions { bootstrap?: string[]; lan?: boolean; lanDiagnostic?(event: string): void; onHints?(hints: { peers: string[]; nodes: { host: string; port: number }[] }): void }
 export interface P2PSession extends Session { diagnostics(): { peers: number; relayAttempts: number; lanPeers: number; routingNodes: number } }
 
 /** LAN multicast/TCP and WAN DHT/Noise race in parallel; payloads are always authenticated and encrypted. */
@@ -131,7 +131,7 @@ export function groupSession(credentials: GroupCredentials, callbacks: Callbacks
     });
   }
   swarm.on('connection', (socket: PeerSocket) => attach(socket, socket));
-  const lan = options.lan === false ? undefined : discoverLAN(credentials, socket => attach(socket));
+  const lan = options.lan === false ? undefined : discoverLAN(credentials, socket => attach(socket), options.lanDiagnostic);
   swarm.on('error', () => { if (!closed && !members.size) callbacks.onStatus('reconnecting', 'P2P 탐색을 다시 시도하고 있습니다. 네트워크와 방화벽을 확인해 주세요.'); });
   const discovery = swarm.join(Buffer.from(credentials.room, 'base64url'), { server: true, client: true });
   void discovery.flushed().then(async () => { update(); if (!closed) await discovery.refresh(); }).catch(() => {
