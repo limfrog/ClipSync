@@ -1,7 +1,7 @@
 export const MAX_FILE_BYTES = 500_000_000;
 export const CHUNK_BYTES = 256 * 1024;
 
-export interface Peer { id: string; name: string }
+export interface Peer { id: string; name: string; transport?: 'lan' | 'p2p' }
 export interface ClipboardBatch { id: string; index: number; count: number }
 export type TransferPacket =
   | { type: 'offer'; transferId: string; name: string; size: number; sha256: string; image: boolean; clipboard?: ClipboardBatch }

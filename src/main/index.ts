@@ -57,8 +57,19 @@ function hideWindow() {
 
 function p2pOptions() {
   // Custom discovery nodes support private deployments and isolated integration tests.
+  const identity = savedGroup?.deviceId;
   const bootstrap = process.env.CLIPSYNC_DHT_BOOTSTRAP?.split(',').map(value => value.trim()).filter(Boolean);
-  return bootstrap?.length ? { bootstrap } : {};
+  return { ...(bootstrap?.length ? { bootstrap } : {}), onHints(hints: { peers: string[]; nodes: { host: string; port: number }[] }) {
+    if (!identity || quitting) return;
+    const work = connectionQueue.then(async () => {
+      if (savedGroup?.deviceId !== identity || !remembered) return;
+      const nodes = hints.nodes.length ? hints.nodes : savedGroup.nodes;
+      if (JSON.stringify(savedGroup.peers) === JSON.stringify(hints.peers) && JSON.stringify(savedGroup.nodes) === JSON.stringify(nodes)) return;
+      savedGroup = { ...savedGroup, peers: hints.peers, ...(nodes ? { nodes } : {}) };
+      await connectionStore.save(savedGroup);
+    });
+    connectionQueue = work.catch(() => {});
+  } };
 }
 
 function connectionInfo() { return { groupKey: savedGroup?.groupKey ?? '', remembered }; }
@@ -202,6 +213,7 @@ void app.whenReady().then(async () => {
       const work = connectionQueue.then(() => connectGroup(input)); connectionQueue = work.catch(() => {}); return work;
     },
     'copy-group-key': () => { if (!savedGroup) throw new Error('먼저 기기를 연결해 주세요.'); return controller.copyGroupKey(savedGroup.groupKey); },
+    rediscover: () => controller.rediscover(),
     disconnect: () => {
       const work = connectionQueue.then(async () => {
         await connectionStore.clear(); savedGroup = null; remembered = false; await controller.disconnect();

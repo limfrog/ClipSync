@@ -30,6 +30,7 @@ module.exports = {
     files: ['!node_modules/**/prebuilds/{android-*,ios-*,linux-*,win32-*}/**/*'],
     target: [{ target: 'pkg', arch: ['arm64', 'x64'] }],
     category: 'public.app-category.utilities',
+    extendInfo: { NSLocalNetworkUsageDescription: '같은 네트워크의 컴퓨터를 찾고 클립보드를 직접 동기화하기 위해 로컬 네트워크에 접근합니다.' },
     identity: '-',
     hardenedRuntime: false,
     artifactName: 'ClipSync-${version}-macOS-${arch}.${ext}',

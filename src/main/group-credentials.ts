@@ -30,5 +30,8 @@ export function validateStoredGroup(value: unknown): GroupCredentials {
   if (!/^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{20}$/.test(p.groupKey) || !/^[0-9a-f-]{36}$/.test(p.deviceId) ||
       ![p.room, p.authKey, p.key, p.seed].every(key => typeof key === 'string' && /^[A-Za-z0-9_-]{43}$/.test(key) && Buffer.from(key, 'base64url').toString('base64url') === key) ||
       createHash('sha256').update(Buffer.from(p.authKey, 'base64url')).digest('base64url') !== p.room) throw new Error('저장된 연결 정보를 확인해 주세요.');
-  return { groupKey: p.groupKey, deviceId: p.deviceId, room: p.room, authKey: p.authKey, key: p.key, seed: p.seed };
+  return { groupKey: p.groupKey, deviceId: p.deviceId, room: p.room, authKey: p.authKey, key: p.key, seed: p.seed,
+    ...(Array.isArray(p.peers) ? { peers: [...new Set(p.peers.filter(key => typeof key === 'string' && /^[A-Za-z0-9_-]{43}$/.test(key) && Buffer.from(key, 'base64url').toString('base64url') === key))].slice(-15) } : {}),
+    ...(Array.isArray(p.nodes) ? { nodes: p.nodes.filter(node => node && typeof node.host === 'string' && /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(node.host) && node.host.split('.').every(part => Number(part) <= 255) && Number.isInteger(node.port) && node.port > 0 && node.port <= 65535).slice(-16).map(({ host, port }) => ({ host, port })) } : {}),
+  };
 }

@@ -36,7 +36,7 @@ test('remembered connection reloads derived credentials, deletes on disconnect a
   const filename = path.join(dir, 'connection.enc');
   const store = new ConnectionStore(filename, secrets);
   const input = { groupKey: createGroupKey(), password: 'private-password-1234' };
-  const credentials = await deriveGroup(input);
+  const credentials = { ...await deriveGroup(input), peers: [randomBytes(32).toString('base64url')], nodes: [{ host: '192.168.1.2', port: 12345 }] };
   assert.equal(await store.save(credentials), true);
   const bytes = await readFile(filename);
   for (const value of [input.password, input.groupKey, credentials.key, credentials.authKey]) assert.equal(bytes.includes(value), false);
@@ -56,7 +56,7 @@ test('three equal P2P devices isolate wrong passwords, survive any peer exit and
   const texts: string[][] = [[], [], [], []]; const peers = [0, 0, 0, 0];
   const current = ['', '', '', ''];
   function start(index: number) {
-    const session = groupSession(credentials[index], { onText: text => { texts[index].push(text); current[index] = text; }, onPeers: count => { peers[index] = count; }, onDevices: () => {}, onTransfer: () => {}, onStatus: () => {} }, { bootstrap: network.bootstrap });
+    const session = groupSession(credentials[index], { onText: text => { texts[index].push(text); current[index] = text; }, onPeers: count => { peers[index] = count; }, onDevices: () => {}, onTransfer: () => {}, onStatus: () => {} }, { bootstrap: network.bootstrap, lan: false });
     sessions.push(session); return session;
   }
   const a = start(0); await delay(150);
@@ -73,4 +73,28 @@ test('three equal P2P devices isolate wrong passwords, survive any peer exit and
   current[1] = '동시 복사 B'; b.publish(current[1]); current[2] = '동시 복사 C'; c.publish(current[2]);
   await until(() => current[0] === current[1] && current[1] === current[2] && ['동시 복사 B', '동시 복사 C'].includes(current[0]), 'Concurrent P2P copies did not converge');
   for (const session of sessions) assert.equal(session.diagnostics().relayAttempts, 0);
+});
+
+test('remembered Noise identity and DHT nodes restore a direct connection without matching topic discovery', { timeout: 15000 }, async t => {
+  const network = await localDHT();
+  const sessions: P2PSession[] = [];
+  t.after(async () => { for (const session of sessions) await session.close(); await network.close(); });
+  const input = { groupKey: createGroupKey(), password: 'remember-peer-1234' };
+  let credentials = await deriveGroup(input);
+  const other = await deriveGroup(input);
+  let count = 0; const texts: string[] = [];
+  const callbacks = { onText: (text: string) => { texts.push(text); }, onPeers: (peers: number) => { count = peers; }, onDevices: () => {}, onTransfer: () => {}, onStatus: () => {} };
+  const first = groupSession(credentials, callbacks, { bootstrap: network.bootstrap, lan: false, onHints: hints => { credentials = { ...credentials, ...hints }; } });
+  sessions.push(first);
+  const peer = groupSession(other, { ...callbacks, onPeers: () => {} }, { bootstrap: network.bootstrap, lan: false }); sessions.push(peer);
+  await until(() => count === 1, 'Initial DHT connection', 10000);
+  assert.equal(credentials.peers?.length, 1); assert.ok(credentials.nodes?.length);
+  await first.close(); count = 0;
+  // Deliberately give the restarted peer an unrelated topic: only cached peer lookup can find B.
+  const restored = groupSession({ ...credentials, room: randomBytes(32).toString('base64url') }, callbacks, { bootstrap: network.bootstrap, lan: false }); sessions.push(restored);
+  const before = Date.now();
+  await until(() => count === 1, 'Known peer should bypass topic matching', 8000);
+  t.diagnostic(`cached identity reconnect through isolated DHT: ${Date.now() - before} ms`);
+  peer.publish('기억한 기기에 바로 연결'); await until(() => texts.includes('기억한 기기에 바로 연결'));
+  assert.equal(restored.diagnostics().lanPeers, 0); assert.equal(restored.diagnostics().relayAttempts, 0);
 });

@@ -26,6 +26,7 @@ const api: ClipSyncAPI = {
     return () => ipcRenderer.removeListener('clipsync:preferences', handler);
   },
   state: async () => decodeState(await ipcRenderer.invoke('clipsync:get-state')),
+  rediscover: () => ipcRenderer.invoke('clipsync:rediscover'),
   disconnect: () => ipcRenderer.invoke('clipsync:disconnect'),
   pause: paused => ipcRenderer.invoke('clipsync:pause', paused),
   chooseFile: peerId => ipcRenderer.invoke('clipsync:choose-file', peerId),

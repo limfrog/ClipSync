@@ -10,7 +10,6 @@ import { test } from 'node:test';
 import { setTimeout } from 'node:timers/promises';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import { until } from './helpers';
-import { localDHT } from './p2p-helpers';
 
 interface Desktop { app: ElectronApplication; page: Page; display: string; profile: string }
 interface CheckResult { name: string; status: 'passed' | 'failed'; durationMs: number; error?: string }
@@ -84,7 +83,6 @@ async function screenshot(desktop: Desktop, file: string) {
 
 test('two packaged desktops with independent OS clipboards', { timeout: 600000 }, async t => {
   assert.equal(process.platform, 'linux', 'This isolated-display test requires Linux with Xvfb');
-  const network = await localDHT();
   const executable = process.env.CLIPSYNC_EXECUTABLE || path.resolve('release/ClipSync-linux-x64/ClipSync');
   await mkdir('test-results', { recursive: true });
   const report = {
@@ -95,7 +93,7 @@ test('two packaged desktops with independent OS clipboards', { timeout: 600000 }
     version: JSON.parse(await readFile('package.json', 'utf8')).version as string,
     outcome: 'running' as 'running' | 'passed' | 'failed',
     independentDisplays: [] as string[],
-    network: 'Equal peers; isolated UDP DHT discovery; direct encrypted PC-to-PC transfer without a data relay',
+    network: 'Equal peers; authenticated LAN discovery with DHT unavailable; encrypted direct TCP without a data relay',
     checks: [] as CheckResult[],
   };
   const displays: Awaited<ReturnType<typeof displayServer>>[] = [];
@@ -109,7 +107,6 @@ test('two packaged desktops with independent OS clipboards', { timeout: 600000 }
       for (const running of runningApps) {
         if (!running.closed) await running.app.close();
       }
-      await network.close();
       cleaned = true;
     } finally {
       for (const display of displays) display.process.kill();
@@ -129,7 +126,7 @@ test('two packaged desktops with independent OS clipboards', { timeout: 600000 }
     const app = await electron.launch({
       executablePath: executable,
       args: process.env.CLIPSYNC_TEST_NO_SANDBOX === '1' ? ['--no-sandbox'] : [],
-      env: { ...process.env, DISPLAY: display.display, CLIPSYNC_DATA_DIR: profile, CLIPSYNC_DHT_BOOTSTRAP: network.bootstrap.join(',') },
+      env: { ...process.env, DISPLAY: display.display, CLIPSYNC_DATA_DIR: profile, CLIPSYNC_DHT_BOOTSTRAP: '127.0.0.1:1' },
     });
     const running = { app, closed: false };
     runningApps.push(running);
@@ -189,6 +186,9 @@ test('two packaged desktops with independent OS clipboards', { timeout: 600000 }
     await client.page.getByLabel('연결 비밀번호 · 8자 이상').fill(password);
     await client.page.getByRole('button', { name: '연결 저장', exact: true }).click();
     await until(async () => (await state(client)).mode === 'group' && (await state(host)).peers === 1, 'P2P apps did not connect', 15000);
+    assert.equal((await state(host)).devices[0].transport, 'lan');
+    assert.equal((await state(client)).devices[0].transport, 'lan');
+    const retry = await client.page.evaluate(() => window.clipSync.rediscover()); assert.equal(retry.ok, true);
     await client.page.getByRole('button', { name: '기기 연결 닫기', exact: true }).click();
     await setTimeout(900);
     assert.equal((await state(host)).sent, 0); assert.equal((await state(client)).sent, 0);

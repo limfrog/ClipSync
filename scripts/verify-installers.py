@@ -200,6 +200,7 @@ def verify_mac(arch):
         header = stream.read(8)
     require(struct.unpack('<II', header) == (0xFEEDFACF, 0x100000C if arch == 'arm64' else 0x1000007), 'Wrong CPU architecture')
     plist = plistlib.loads((app / 'Contents/Info.plist').read_bytes())
+    require(bool(plist.get('NSLocalNetworkUsageDescription')), 'Missing local network permission description')
     require(plist['CFBundleIdentifier'] == 'dev.limfrog.clipsync' and plist['CFBundleShortVersionString'] == VERSION, 'Wrong app metadata')
     spec = importlib.util.spec_from_file_location('verify_macos_app', ROOT / 'scripts/verify-macos-app.py')
     verifier = importlib.util.module_from_spec(spec)

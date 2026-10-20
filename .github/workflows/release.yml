@@ -87,6 +87,7 @@ jobs:
         run: |
           for app in release/installers/mac*/ClipSync.app; do
             codesign --verify --deep --strict "$app"
+            /usr/libexec/PlistBuddy -c "Print :NSLocalNetworkUsageDescription" "$app/Contents/Info.plist"
           done
           for pkg in release/installers/ClipSync-*-macOS-*.pkg; do
             pkgutil --expand "$pkg" "$RUNNER_TEMP/$(basename "$pkg").expanded"

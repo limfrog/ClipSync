@@ -6,6 +6,8 @@ export interface GroupCredentials {
   authKey: string;
   key: string;
   seed: string;
+  peers?: string[];
+  nodes?: { host: string; port: number }[];
 }
 export type GroupStatus = 'discovering' | 'connected' | 'reconnecting';
 export interface ConnectionInfo { groupKey: string; remembered: boolean }

@@ -3,10 +3,10 @@ declare module 'hyperswarm' {
   import { Duplex } from 'node:stream';
   export interface PeerSocket extends Duplex { handshakeHash: Buffer; remotePublicKey: Buffer; setKeepAlive(ms: number): void }
   export default class Hyperswarm extends EventEmitter {
-    constructor(options?: { seed?: Buffer; bootstrap?: string[]; maxPeers?: number; relayThrough?: null; backoffs?: number[] });
+    constructor(options?: { seed?: Buffer; bootstrap?: string[]; maxPeers?: number; relayThrough?: null; backoffs?: number[]; nodes?: { host: string; port: number }[]; maxParallel?: number; jitter?: number });
     connections: Set<PeerSocket>;
     keyPair: { publicKey: Buffer; secretKey: Buffer };
-    dht: EventEmitter & { bootstrapped: boolean; stats: { relaying: { attempts: number; successes: number } } };
+    dht: EventEmitter & { bootstrapped: boolean; toArray(options: { limit: number }): { host: string; port: number }[]; stats: { relaying: { attempts: number; successes: number } } };
     join(topic: Buffer, options?: { server: boolean; client: boolean }): { refresh(): Promise<void>; flushed(): Promise<void> };
     joinPeer(publicKey: Buffer): void;
     leavePeer(publicKey: Buffer): void;

@@ -17,6 +17,7 @@ export interface Session {
   publish(text: string): void;
   sendTransfer(packet: TransferPacket, to: string): void;
   close(): Promise<void>;
+  refresh?(): void;
 }
 
 const MAX_WIRE_BYTES = MAX_TEXT_BYTES * 8 + 4096;

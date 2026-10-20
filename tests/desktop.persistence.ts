@@ -52,6 +52,13 @@ test('native dragging, secure connection restore, hide keeps syncing, quit exits
   await until(async () => (await first.page.evaluate(() => window.clipSync.connection())).remembered);
   peer = groupSession(await deriveGroup({ groupKey, password }), { onText: () => {}, onPeers: () => {}, onDevices: () => {}, onTransfer: () => {}, onStatus: () => {} }, { bootstrap: network.bootstrap });
   await until(async () => (await first.page.evaluate(() => window.clipSync.state())).peers === 1, 'Initial P2P connection failed', 15000);
+  await until(async () => {
+    const bytes = await readFile(path.join(profile, 'connection.enc'));
+    const count = await first.app.evaluate(({ safeStorage }, encoded) => {
+      return JSON.parse(safeStorage.decryptString(Buffer.from(encoded, 'base64'))).peers?.length ?? 0;
+    }, bytes.toString('base64'));
+    return count === 1;
+  }, 'Authenticated peer hints were not persisted with native encryption');
   const stored = await readFile(path.join(profile, 'connection.enc'));
   assert.equal(stored.includes(password), false); assert.equal(stored.includes(groupKey), false);
   await first.page.getByRole('button', { name: '기기 연결 닫기', exact: true }).click();

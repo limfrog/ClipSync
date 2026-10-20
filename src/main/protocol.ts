@@ -41,11 +41,11 @@ export function parseInvitation(value: string): Invitation {
   }
 }
 
-export function proof(key: string, role: 'client' | 'server', challenge: string): string {
+export function proof(key: string, role: 'client' | 'server' | 'lan', challenge: string): string {
   return createHmac('sha256', keyBuffer(key)).update(`${role}:${challenge}`).digest('base64url');
 }
 
-export function verifyProof(key: string, role: 'client' | 'server', challenge: string, candidate: unknown): boolean {
+export function verifyProof(key: string, role: 'client' | 'server' | 'lan', challenge: string, candidate: unknown): boolean {
   if (typeof candidate !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(candidate)) return false;
   return timingSafeEqual(Buffer.from(proof(key, role, challenge)), Buffer.from(candidate));
 }

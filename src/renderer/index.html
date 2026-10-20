@@ -48,9 +48,9 @@
       <button id="connect-group" class="button primary full" type="submit">연결 저장</button>
     </form>
     <section id="group-panel" class="section-card" hidden><h3>내 P2P 연결 그룹</h3><p id="group-key-display"></p><button id="copy-group-key" class="button secondary full">연결 키 복사</button><p id="remember-status" class="small-note"></p></section>
-    <div id="session-actions" hidden><p id="session-title"></p><div class="action-row"><button id="pause" class="button secondary">일시정지</button><button id="disconnect" class="button quiet">연결 해제 및 저장 삭제</button></div></div>
+    <div id="session-actions" hidden><p id="session-title"></p><button id="rediscover" class="button secondary full">다시 찾기</button><div class="action-row"><button id="pause" class="button secondary">일시정지</button><button id="disconnect" class="button quiet">연결 해제 및 저장 삭제</button></div></div>
     <div class="connection-stats"><span>연결 <b id="peer-count">0</b>대</span><span>보냄 <b id="sent-count">0</b>개</span><span>받음 <b id="received-count">0</b>개</span></div>
-    <p class="small-note">전용 서버 없이 PC끼리 직접 연결합니다. 공개 분산 탐색망으로 기기를 찾으며, UDP 차단·일부 NAT 환경에서는 연결되지 않을 수 있습니다. 유료 중계는 사용하지 않습니다.</p><p class="small-note">이미지·프로그램·파일당 최대 500MB · 한글 파일명 보존</p>
+    <p class="small-note">전용 서버 없이 PC끼리 직접 연결합니다. 같은 네트워크에서는 바로 찾고, 외부망에서는 공개 분산 탐색망을 함께 사용합니다. UDP 차단·일부 NAT 환경에서는 연결되지 않을 수 있습니다. 유료 중계는 사용하지 않습니다.</p><p class="small-note">이미지·프로그램·파일당 최대 500MB · 한글 파일명 보존</p>
   </dialog>
 
   <dialog id="settings-dialog" aria-labelledby="settings-title">

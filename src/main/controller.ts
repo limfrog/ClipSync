@@ -134,6 +134,8 @@ export class SyncController {
     });
   }
 
+  rediscover() { this.session?.refresh?.(); }
+
   protectText(text: string) { this.privateTexts.add(text); if (this.privateTexts.size > 32) this.privateTexts.delete(this.privateTexts.values().next().value!); }
   async copyGroupKey(key: string) {
     this.privateTexts.add(key);

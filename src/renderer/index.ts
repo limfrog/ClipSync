@@ -57,7 +57,7 @@ function render(state: SyncState) {
   current = state;
   const connected = state.mode !== 'idle';
   element('status').textContent = state.paused ? '동기화 일시정지' : state.peers ? `${state.peers}대 P2P 연결` : state.groupStatus === 'reconnecting' ? '자동 재연결 중' : connected ? 'P2P 기기 찾는 중' : '연결 대기';
-  element('status').classList.toggle('connected', connected && !state.paused);
+  element('status').classList.toggle('connected', state.peers > 0 && !state.paused);
   element('group-form').hidden = connected;
   element('group-panel').hidden = !connected;
   element('session-actions').hidden = !connected;
@@ -69,8 +69,10 @@ function render(state: SyncState) {
   if (signature !== peerSignature) {
     peerSignature = signature;
     const devices = element('devices'); devices.replaceChildren();
-    for (const name of ['이 PC', ...state.devices.map(peer => peer.name)]) {
-      const chip = document.createElement('span'); chip.className = 'device-chip'; chip.textContent = name; devices.append(chip);
+    for (const [index, name] of ['이 PC', ...state.devices.map(peer => peer.name)].entries()) {
+      const chip = document.createElement('span'); chip.className = 'device-chip'; chip.textContent = name;
+      if (index > 0) chip.title = state.devices[index - 1].transport === 'lan' ? '내부 네트워크 직접 연결' : 'P2P 직접 연결';
+      devices.append(chip);
     }
     if (!state.devices.length) { const hint = document.createElement('span'); hint.className = 'device-hint'; hint.textContent = '기기 연결에서 다른 PC를 추가하세요'; devices.append(hint); }
   }
@@ -180,6 +182,7 @@ element('group-form').addEventListener('submit', event => {
   });
 });
 element('copy-group-key').addEventListener('click', () => { void act(() => window.clipSync.copyGroupKey(), '연결 키를 복사했어요. 비밀번호도 별도로 전달하세요.'); });
+element('rediscover').addEventListener('click', () => { void act(() => window.clipSync.rediscover(), '기기를 다시 찾고 있어요.'); });
 element('pause').addEventListener('click', () => { void act(() => window.clipSync.pause(!current.paused)); });
 element('disconnect').addEventListener('click', () => { void act(async () => { const result = await window.clipSync.disconnect(); if (result.ok) { updateConnection({ groupKey: '', remembered: false }); element<HTMLInputElement>('group-password').value = ''; } return result; }); });
 element('settings-form').addEventListener('submit', event => {
