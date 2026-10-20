@@ -34,6 +34,7 @@ export interface ClipSyncAPI {
   openDownloads(): Promise<Result>;
   onPreferences(listener: (preferences: Preferences) => void): () => void;
   state(): Promise<SyncState>;
+  copyDiagnostics(): Promise<Result>;
   rediscover(): Promise<Result>;
   disconnect(): Promise<Result>;
   pause(paused: boolean): Promise<Result>;

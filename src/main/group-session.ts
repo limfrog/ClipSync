@@ -18,7 +18,7 @@ interface Callbacks {
 }
 interface Member { socket: Duplex; id: string; name: string; rank: string; lastSeen: number }
 export interface P2POptions { bootstrap?: string[]; lan?: boolean; lanDiagnostic?(event: string): void; onHints?(hints: { peers: string[]; nodes: { host: string; port: number }[] }): void }
-export interface P2PSession extends Session { diagnostics(): { peers: number; relayAttempts: number; lanPeers: number; routingNodes: number } }
+export interface P2PSession extends Session { diagnostics(): { peers: number; relayAttempts: number; lanPeers: number; routingNodes: number; lan?: { udpReady: boolean; tcpReady: boolean; interfaces: number; beacons: number; lastError: string | null } } }
 
 /** LAN multicast/TCP and WAN DHT/Noise race in parallel; payloads are always authenticated and encrypted. */
 export function groupSession(credentials: GroupCredentials, callbacks: Callbacks, options: P2POptions = {}): P2PSession {
@@ -162,7 +162,7 @@ export function groupSession(credentials: GroupCredentials, callbacks: Callbacks
       for (const key of known) swarm.joinPeer(Buffer.from(key, 'base64url'));
       void discovery.refresh().catch(() => {}); update();
     },
-    diagnostics: () => ({ peers: members.size, relayAttempts: swarm.dht.stats.relaying.attempts, lanPeers: [...members.values()].filter(member => member.rank.startsWith('0:')).length, routingNodes: swarm.dht.toArray({ limit: 16 }).length }),
+    diagnostics: () => ({ peers: members.size, relayAttempts: swarm.dht.stats.relaying.attempts, lanPeers: [...members.values()].filter(member => member.rank.startsWith('0:')).length, routingNodes: swarm.dht.toArray({ limit: 16 }).length, lan: lan?.diagnostics() }),
     publish(text) {
       const stamp = ++clock;
       const payload = sealGroupText(credentials.key, text, stamp, credentials.deviceId);

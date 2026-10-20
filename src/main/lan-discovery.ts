@@ -8,7 +8,8 @@ import { proof, verifyProof } from './protocol';
 export function discoverLAN(credentials: GroupCredentials, connected: (socket: Socket) => void, diagnostic?: (event: string) => void) {
   const reported = new Set<string>();
   function report(event: string) { if (reported.size < 40 && !reported.has(event)) { reported.add(event); diagnostic?.(event); } }
-  const code = (error: unknown) => (error as NodeJS.ErrnoException).code ?? 'unknown';
+  let lastError: string | null = null, beacons = 0;
+  const code = (error: unknown) => { lastError = (error as NodeJS.ErrnoException).code ?? 'unknown'; return lastError; };
   const bytes = Buffer.from(credentials.room, 'base64url');
   const address = `239.255.${bytes[0]}.${bytes[1]}`;
   const port = 47834;
@@ -20,18 +21,30 @@ export function discoverLAN(credentials: GroupCredentials, connected: (socket: S
   const sockets = new Set<Socket>();
   const attempts = new Map<string, number>();
   const targets = new Set<string>();
-  let stopped = false, ready = false, tcpPort = 0, lastReply = 0;
+  let stopped = false, ready = false, announcing = false, tcpPort = 0, lastReply = 0;
   let interfaces: string[] = [];
   const payload = () => {
     const body = `${credentials.room}:${credentials.deviceId}:${tcpPort}`;
     return Buffer.from(JSON.stringify({ room: credentials.room, id: credentials.deviceId, port: tcpPort, mac: proof(credentials.authKey, 'lan', body) }));
   };
   function announce() {
-    if (!ready || !tcpPort || stopped) return;
-    const data = payload();
-    for (const iface of interfaces) {
-      try { udp.setMulticastInterface(iface); udp.send(data, port, address, error => { if (error) report(`send ${iface}: ${code(error)}`); }); } catch (error) { report(`interface ${iface}: ${code(error)}`); /* Interface may disappear during sleep/VPN changes. */ }
+    if (!ready || !tcpPort || stopped || announcing) return;
+    const data = payload(), pending = [...interfaces];
+    announcing = true;
+    function next() {
+      const iface = pending.shift();
+      if (stopped || !iface) { announcing = false; return; }
+      try {
+        // dgram.send resolves addresses asynchronously. Changing the interface before its
+        // callback sends every queued packet on the final (possibly virtual/VPN) interface.
+        udp.setMulticastInterface(iface);
+        udp.send(data, port, address, error => {
+          if (error) report(`send ${iface}: ${code(error)}`);
+          next();
+        });
+      } catch (error) { report(`interface ${iface}: ${code(error)}`); next(); }
     }
+    next();
   }
   function joinInterfaces() {
     if (!ready || stopped) return;
@@ -48,7 +61,7 @@ export function discoverLAN(credentials: GroupCredentials, connected: (socket: S
       if (value.room !== credentials.room || typeof value.id !== 'string' || !/^[0-9a-f-]{36}$/.test(value.id) || value.id === credentials.deviceId ||
           !Number.isInteger(value.port) || value.port < 1 || value.port > 65535 ||
           !verifyProof(credentials.authKey, 'lan', `${value.room}:${value.id}:${value.port}`, value.mac)) return;
-      report(`beacon ${remote.address}`);
+      beacons++; report(`beacon ${remote.address}`);
       if (Date.now() - lastReply > 500) { lastReply = Date.now(); announce(); }
       // One deterministic initiator prevents simultaneous TCP connections on both PCs.
       if (credentials.deviceId > value.id) return;
@@ -76,6 +89,7 @@ export function discoverLAN(credentials: GroupCredentials, connected: (socket: S
   const interfacesTimer = setInterval(() => { joinInterfaces(); announce(); }, 10000); interfacesTimer.unref();
   return {
     refresh: announce,
+    diagnostics: () => ({ udpReady: ready, tcpReady: tcpPort > 0, interfaces: interfaces.length, beacons, lastError }),
     close() {
       stopped = true; clearInterval(timer); clearInterval(interfacesTimer);
       for (const socket of sockets) socket.destroy();

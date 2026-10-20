@@ -24,7 +24,7 @@ async function displayServer(): Promise<{ process: ChildProcess; display: string
   const process = spawn(globalThis.process.env.CLIPSYNC_XVFB || 'Xvfb', ['-displayfd', '1', '-screen', '0', '1280x1000x24', '-nolisten', 'tcp'], { stdio: ['ignore', 'pipe', 'pipe'] });
   try {
     const display = await new Promise<string>((resolve, reject) => {
-      const timer = globalThis.setTimeout(() => reject(new Error('Xvfb startup timed out')), 10000);
+      const timer = globalThis.setTimeout(() => reject(new Error('Xvfb startup timed out')), 30000);
       let output = '';
       process.stdout!.on('data', chunk => {
         output += chunk.toString();
@@ -193,6 +193,12 @@ test('two packaged desktops with independent OS clipboards', { timeout: 600000 }
     await setTimeout(900);
     assert.equal((await state(host)).sent, 0); assert.equal((await state(client)).sent, 0);
     assert.ok(await clipboard(client) === 'client-only-before-connection', 'Pre-connection clipboard content was shared');
+    assert.equal((await client.page.evaluate(() => window.clipSync.copyDiagnostics())).ok, true);
+    const raw = await clipboard(client); const report = JSON.parse(raw);
+    assert.equal(report.lanPeers, 1); assert.equal(report.lan.udpReady, true);
+    assert.equal(raw.includes(groupKey), false); assert.equal(raw.includes(password), false);
+    assert.equal(raw.includes('client-only-before-connection'), false);
+    await setTimeout(750); assert.equal(await clipboard(host), groupKey, 'Support report must not be synchronized');
   });
 
   await check('keyboard copy and paste work in both directions with Unicode and multiline text', async () => {

@@ -213,6 +213,13 @@ void app.whenReady().then(async () => {
       const work = connectionQueue.then(() => connectGroup(input)); connectionQueue = work.catch(() => {}); return work;
     },
     'copy-group-key': () => { if (!savedGroup) throw new Error('먼저 기기를 연결해 주세요.'); return controller.copyGroupKey(savedGroup.groupKey); },
+    'copy-diagnostics': () => {
+      const state = controller.state();
+      const report = { app: 'ClipSync', version: app.getVersion(), platform: process.platform, arch: process.arch,
+        status: state.groupStatus ?? state.mode, remembered, paused: state.paused, ...controller.connectionDiagnostics() };
+      // Use the private clipboard path so a support report is neither recorded nor synchronized.
+      return controller.copyGroupKey(JSON.stringify(report, null, 2));
+    },
     rediscover: () => controller.rediscover(),
     disconnect: () => {
       const work = connectionQueue.then(async () => {

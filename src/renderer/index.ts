@@ -182,6 +182,7 @@ element('group-form').addEventListener('submit', event => {
   });
 });
 element('copy-group-key').addEventListener('click', () => { void act(() => window.clipSync.copyGroupKey(), '연결 키를 복사했어요. 비밀번호도 별도로 전달하세요.'); });
+element('copy-diagnostics').addEventListener('click', () => { void act(() => window.clipSync.copyDiagnostics(), '키·비밀번호·클립보드 내용을 제외한 연결 상태를 복사했어요.'); });
 element('rediscover').addEventListener('click', () => { void act(() => window.clipSync.rediscover(), '기기를 다시 찾고 있어요.'); });
 element('pause').addEventListener('click', () => { void act(() => window.clipSync.pause(!current.paused)); });
 element('disconnect').addEventListener('click', () => { void act(async () => { const result = await window.clipSync.disconnect(); if (result.ok) { updateConnection({ groupKey: '', remembered: false }); element<HTMLInputElement>('group-password').value = ''; } return result; }); });

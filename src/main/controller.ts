@@ -7,7 +7,7 @@ import type { ClipboardBatch, Peer, TransferPacket } from '../shared/transfers';
 import type { HistoryItem } from '../shared/history';
 import { ClipboardHistory } from './history';
 import type { GroupCredentials } from '../shared/group';
-import { groupSession, type P2POptions } from './group-session';
+import { groupSession, type P2POptions, type P2PSession } from './group-session';
 
 export interface Clipboard { readText(): string | null | Promise<string | null>; writeText(text: string): void | Promise<void> }
 
@@ -133,6 +133,8 @@ export class SyncController {
       this.update({ mode: 'group', groupStatus: 'discovering', invitation: '' });
     });
   }
+
+  connectionDiagnostics() { return this.current.mode === 'group' ? (this.session as P2PSession)?.diagnostics() : null; }
 
   rediscover() { this.session?.refresh?.(); }
 

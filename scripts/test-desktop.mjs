@@ -7,7 +7,7 @@ try {
   if (process.platform === 'linux' && !env.DISPLAY) {
     displayServer = spawn(env.CLIPSYNC_XVFB || 'Xvfb', ['-displayfd', '1', '-screen', '0', '1280x900x24', '-nolisten', 'tcp'], { stdio: ['ignore', 'pipe', 'inherit'] });
     env.DISPLAY = await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Xvfb startup timed out')), 10000);
+      const timeout = setTimeout(() => reject(new Error('Xvfb startup timed out')), 30000);
       let output = '';
       displayServer.stdout.on('data', chunk => {
         output += chunk.toString();
