@@ -1,0 +1,53 @@
+name: Installers
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: node node_modules/electron/install.js
+      - run: npm test
+      - run: npm run dist:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ClipSync-Windows-x64
+          path: release/installers/*-Setup.exe
+          if-no-files-found: error
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: node node_modules/electron/install.js
+      - run: npm test
+      - run: npm run dist:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Verify native app signatures and expand PKGs
+        run: |
+          for app in release/installers/mac*/ClipSync.app; do
+            codesign --verify --deep --strict "$app"
+          done
+          for pkg in release/installers/ClipSync-*-macOS-*.pkg; do
+            pkgutil --expand "$pkg" "$RUNNER_TEMP/$(basename "$pkg").expanded"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ClipSync-macOS
+          path: release/installers/ClipSync-*-macOS-*.pkg
+          if-no-files-found: error

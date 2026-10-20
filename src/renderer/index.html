@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+    <title>ClipSync</title>
+    <script type="module" src="./index.ts"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#" aria-label="ClipSync 홈"><span class="brand-icon">C<span>↗</span></span>ClipSync</a>
+        <span class="workspace-label">WORKSPACE</span>
+        <div class="nav-item"><span aria-hidden="true">⇄</span> 클립보드 동기화 <span class="nav-dot"></span></div>
+        <div class="sidebar-bottom"><span class="local-icon">⌘</span><div>내 기기에서 직접<span>텍스트 · 이미지 · 파일</span></div></div>
+      </aside>
+
+      <main>
+        <header><div class="breadcrumb">내 작업 공간 <span>/</span> 클립보드 동기화</div><span class="version">v0.2.0</span></header>
+        <div class="content">
+          <div class="page-heading"><div><div class="eyebrow">COPY HERE. PASTE THERE.</div><h1>클립보드를 하나로.</h1><p>어느 PC에서 복사해도, 다른 PC에서 바로 붙여넣으세요.</p></div><span class="status-badge" id="status" role="status">연결 대기</span></div>
+
+          <section class="session-panel" aria-label="연결 상태">
+            <div class="session-symbol" aria-hidden="true">⇄</div>
+            <div class="session-description"><h2 id="session-title">PC를 연결할 준비가 됐어요</h2><p id="session-detail">한 PC에서 연결을 열고, 다른 PC에서 참여하세요.</p></div>
+            <div class="session-actions" id="session-actions" hidden><button id="pause" class="button secondary">일시정지</button><button id="disconnect" class="button quiet">연결 해제</button></div>
+          </section>
+
+          <div id="error" class="error-message" role="alert" hidden></div>
+          <div id="notice" class="notice-message" role="status" hidden></div>
+
+          <div class="connection-grid" id="connection-grid">
+            <section class="card">
+              <div class="card-topline"><span class="step-number">01</span><span class="card-tag">첫 번째 PC</span></div>
+              <h2>새 연결 열기</h2><p>이 PC를 중심으로 다른 PC들을 연결하세요.<br />참여할 기기에 초대 코드를 전달하면 됩니다.</p>
+              <button id="host" class="button primary full">연결 열기 <span aria-hidden="true">↗</span></button>
+              <div class="card-footnote">같은 Wi-Fi 또는 유선 네트워크가 필요해요.</div>
+            </section>
+            <section class="card">
+              <div class="card-topline"><span class="step-number">02</span><span class="card-tag">참여할 PC</span></div>
+              <h2>기존 연결에 참여</h2><p>다른 PC에서 받은 초대 코드를 붙여넣으세요.<br />연결한 뒤 새로 복사한 텍스트부터 공유돼요.</p>
+              <form id="join-form"><label class="sr-only" for="invitation">초대 코드</label><div class="join-row"><input id="invitation" type="text" placeholder="초대 코드 붙여넣기" autocomplete="off" spellcheck="false" required maxlength="512" /><button id="join" class="button secondary" type="submit">참여</button></div></form>
+              <div class="card-footnote">초대 코드는 연결을 연 PC에서 복사할 수 있어요.</div>
+            </section>
+          </div>
+
+          <section class="invitation-panel card" id="invitation-panel" hidden>
+            <div><span class="eyebrow">INVITE YOUR DEVICES</span><h2>다른 PC와 연결하세요</h2><p>초대 코드를 받은 기기가 클립보드 연결에 참여할 수 있습니다.</p></div>
+            <button id="copy-invitation" class="button primary">초대 코드 복사 <span aria-hidden="true">↗</span></button>
+          </section>
+
+          <section class="card file-panel" aria-label="이미지와 파일 전송">
+            <div class="file-panel-heading"><div><span class="eyebrow">SEND TO YOUR DEVICES</span><h2>이미지와 파일 주고받기</h2><p>프로그램·사진 등 파일당 최대 500MB. 받을 PC가 수락하면 전송합니다.</p></div></div>
+            <div class="file-controls"><label for="recipient">받을 PC</label><select id="recipient" aria-label="받을 PC"><option value="">연결된 PC가 없습니다</option></select><button id="send-file" class="button primary">파일 보내기</button><button id="send-image" class="button secondary">클립보드 이미지 보내기</button></div>
+            <div class="card-footnote">한글 파일명을 유지하며, 받은 프로그램은 자동으로 실행하지 않습니다. 폴더·macOS .app은 ZIP으로 보내세요.</div>
+            <div id="transfer-list" class="transfer-list" aria-label="파일 전송 목록"><p class="empty-transfers">아직 주고받은 파일이 없습니다.</p></div>
+          </section>
+
+          <section class="stats" aria-label="동기화 활동"><div><span class="stat-label">연결된 PC</span><div><strong id="peer-count">0</strong><span>대</span></div></div><div><span class="stat-label">보낸 클립보드</span><div><strong id="sent-count">0</strong><span>개</span></div></div><div><span class="stat-label">받은 클립보드</span><div><strong id="received-count">0</strong><span>개</span></div></div><div><span class="stat-label">최근 동기화</span><div class="last-activity" id="last-activity">아직 없어요</div></div></section>
+
+          <footer><span class="privacy-dot"></span><span>텍스트·이미지·파일을 암호화해 전송합니다. 수신 파일은 선택한 위치에 저장됩니다.</span><span class="footer-limit">파일 최대 500MB</span></footer>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,40 @@
+{
+  "name": "clipsync",
+  "version": "0.2.0",
+  "description": "PC 간 클립보드와 최대 500MB 이미지·파일을 공유하는 데스크톱 앱",
+  "private": true,
+  "type": "module",
+  "main": "dist/main.cjs",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "npm run build && npm start",
+    "start": "electron .",
+    "build": "npm run typecheck && node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "test:desktop": "npm run build && node scripts/test-desktop.mjs",
+    "test:pair": "tsx --test tests/desktop.pair.ts",
+    "test:large": "tsx --test tests/transfer.large.ts",
+    "package": "npm run build && node scripts/package.mjs",
+    "dist:win": "npm run build && electron-builder --config electron-builder.config.cjs --win nsis --x64 --publish never",
+    "dist:mac": "npm run build && electron-builder --config electron-builder.config.cjs --mac pkg --arm64 --x64 --publish never",
+    "dist:mac:cross": "npm run build && node scripts/build-mac-apps.mjs && python3 scripts/build-macos-pkg.py"
+  },
+  "dependencies": {
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "@types/node": "26.6.5",
+    "@types/ws": "8.18.2",
+    "electron": "44.9.1",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2",
+    "playwright": "1.64.1",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vite": "8.3.4"
+  }
+}

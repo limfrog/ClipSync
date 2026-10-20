@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: node node_modules/electron/install.js
+      - run: npm test
+      - run: npm run build
+      - run: sudo apt-get update && sudo apt-get install -y xvfb
+        if: runner.os == 'Linux'
+      - run: npm run test:desktop
+        if: runner.os == 'Linux'
+        env:
+          CLIPSYNC_TEST_NO_SANDBOX: '1'
+      - run: npm run package
+        if: runner.os == 'Linux'
+      - run: npm run test:pair
+        if: runner.os == 'Linux'
+        env:
+          CLIPSYNC_TEST_NO_SANDBOX: '1'
+      - run: npm run test:large
+        if: runner.os == 'Linux'
