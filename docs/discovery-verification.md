@@ -29,6 +29,19 @@ LAN 광고는 1초 주기이고 새 기기를 보면 응답합니다. 어댑터�
 
 Mac의 기본·교차 패키징 경로 모두 `NSLocalNetworkUsageDescription`을 포함하며, 네이티브 macOS 릴리스 작업에서 Info.plist 키를 확인합니다. 이는 권한을 자동 승인하거나 실제 Mac–Windows 연결을 확인한 것을 의미하지 않습니다.
 
+## 공개 설치 파일 확인
+
+- 릴리스: [v0.4.3](https://github.com/limfrog/ClipSync/releases/tag/v0.4.3), 제품 커밋 `a79f8ce`.
+- [설치본 빌드·공개](https://github.com/limfrog/ClipSync/actions/runs/39480463518) 성공. Mac의 두 앱에 대해 `codesign --verify --deep --strict`, 로컬 네트워크 사용 목적 Info.plist 키, PKG 확장을 확인했습니다.
+- [제품 코드의 Windows·Apple Silicon Mac·Intel Mac·Linux 자동 검사](https://github.com/limfrog/ClipSync/actions/runs/39480276669)가 모두 성공했습니다. 0.4.3은 해당 제품 코드에서 버전과 릴리스 문서를 갱신한 빌드입니다.
+- 안정적인 공개 HTTPS 링크로 세 설치 파일을 모두 다운로드해 파일 형식·크기·공개 SHA256SUMS.txt와의 일치를 확인했습니다. 다운로드 검증 결과는 로컬 `release/github-download/v0.4.3/download-validation.json`에 있습니다.
+
+| 파일 | 바이트 | SHA-256 |
+| --- | ---: | --- |
+| ClipSync-0.4.3-Windows-x64-Setup.exe | 115,953,087 | `a4834aeac4e365e57f99fda84a904eaf6d0d37b1851d577325f15dc8b01f52e8` |
+| ClipSync-0.4.3-macOS-arm64.pkg | 128,269,587 | `7e27d0de6b10fa5e30ada234d227f0a6fcdc8d22e512178480f48a5ead9ff6ca` |
+| ClipSync-0.4.3-macOS-x64.pkg | 135,226,075 | `7417a1e3aeca03c018ad6e8a9a014533af29c32aeec51a130d91dd6d06bde539` |
+
 ## 실물 Mac–Windows 확인
 
 [같은 공유기에서 두 실물 기기를 확인하는 절차](physical-verification.md)를 별도로 준비했습니다. **연결 상태 복사**는 버전·OS/CPU·탐색/연결 수·오류 코드만 담고, 키·비밀번호·IP·기기 이름·클립보드 내용은 제외합니다. 이 보고서는 기록하거나 상대 PC에 자동 전송하지 않습니다.
