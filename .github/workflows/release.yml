@@ -59,7 +59,9 @@ jobs:
           node --input-type=module -e 'import fs from "node:fs"; const v = JSON.parse(fs.readFileSync("package.json")).version; if (process.env.RELEASE_TAG !== `v${v}`) throw new Error("Tag and package version differ")'
       - run: npm ci
       - run: node node_modules/electron/install.js
-      - run: npm test
+      - name: Test release
+        shell: bash
+        run: bash scripts/check-ci.sh test
       - name: Build installer
         shell: bash
         run: |

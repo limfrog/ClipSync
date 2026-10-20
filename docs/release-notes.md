@@ -1,4 +1,4 @@
-# ClipSync 0.4.2 · 기기 찾기 개선
+# ClipSync 0.4.3 · 기기 찾기 개선
 
 - 같은 네트워크의 PC는 인터넷 탐색 결과를 기다리지 않고 직접 찾습니다. 인터넷 연결이 없어도 같은 네트워크에서 클립보드를 동기화합니다.
 - 이전에 인증한 기기와 탐색 노드 정보를 운영체제 보안 저장소로 보호해 기억합니다. 다음 실행에는 기존 기기로 재접속하는 시도와 새 기기 탐색을 함께 시작합니다.
@@ -10,10 +10,10 @@
 - 내부 연결의 응답을 주기적으로 확인해 끊어진 연결을 정리합니다. 내부·외부 경로가 동시에 발견되어도 같은 기기를 중복 표시하지 않습니다.
 - 텍스트·이미지·500MB 프로그램/파일, 한글 파일명, 트레이·메뉴바 동작은 유지합니다. 새 유료 서비스나 데이터 중계 서버는 추가하지 않았습니다.
 
-빠른 내부 연결을 사용하려면 연결할 PC를 모두 **0.4.2**로 업데이트하세요. **0.4.0의 저장된 연결 정보는 유지**합니다. 설치 전 실행 중인 앱을 오른쪽 아래 **종료**로 닫으세요. macOS 13 이상이 필요하며 폴더·macOS .app은 ZIP으로 압축하세요.
+빠른 내부 연결을 사용하려면 연결할 PC를 모두 **0.4.3**로 업데이트하세요. **0.4.0의 저장된 연결 정보는 유지**합니다. 설치 전 실행 중인 앱을 오른쪽 아래 **종료**로 닫으세요. macOS 13 이상이 필요하며 폴더·macOS .app은 ZIP으로 압축하세요.
 
 방화벽에서 ClipSync 통신을 허용해야 합니다. 같은 공유기여도 게스트 Wi-Fi/AP 격리·멀티캐스트 차단 환경에서는 직접 발견하지 못할 수 있습니다. 외부망은 UDP 차단·대칭 NAT/CGNAT에 따라 여전히 연결되지 않을 수 있습니다. 이번 변경이 모든 외부망의 NAT 통과를 보장하지는 않습니다.
 
 [검증 기록](https://github.com/limfrog/ClipSync/blob/main/docs/discovery-verification.md)에 실제 테스트 범위를 기록했습니다. Linux의 격리된 네트워크·실제 앱 클립보드로 검사했으며, 서로 다른 실제 외부망의 연결 속도와 Windows/macOS 간 실기기 동작은 검증하지 못했습니다.
 
-Windows x64: `ClipSync-0.4.2-Windows-x64-Setup.exe` · Apple Silicon: `ClipSync-0.4.2-macOS-arm64.pkg` · Intel Mac: `ClipSync-0.4.2-macOS-x64.pkg`. SHA-256은 `SHA256SUMS.txt`에서 확인하세요. Windows 배포자 인증서 서명·Apple 공증은 포함하지 않으며, macOS 앱은 ad-hoc 서명입니다.
+Windows x64: `ClipSync-0.4.3-Windows-x64-Setup.exe` · Apple Silicon: `ClipSync-0.4.3-macOS-arm64.pkg` · Intel Mac: `ClipSync-0.4.3-macOS-x64.pkg`. SHA-256은 `SHA256SUMS.txt`에서 확인하세요. Windows 배포자 인증서 서명·Apple 공증은 포함하지 않으며, macOS 앱은 ad-hoc 서명입니다.
