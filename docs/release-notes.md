@@ -9,7 +9,7 @@
 
 양쪽 앱을 오른쪽 아래 **종료**로 닫고 **0.4.4**를 설치하세요. 기존 연결 정보는 유지합니다. 두 앱을 켜고 10초 정도 기다린 뒤 연결 상태를 확인하세요. 연결되지 않으면 양쪽 **기기 연결 → 연결 상태 복사** 보고서를 비교할 수 있습니다.
 
-방화벽과 Mac 로컬 네트워크에서 ClipSync를 허용해야 합니다. 공유기가 기기 간 통신이나 브로드캐스트도 차단하면 연결되지 않을 수 있습니다. 보고된 실물 문제의 원인과 개선 효과는 아직 실물에서 확정하지 않았습니다. 외부망의 UDP·NAT 제한도 유지됩니다.
+방화벽과 Mac 로컬 네트워크에서 ClipSync를 허용해야 합니다. 공유기가 기기 간 통신이나 브로드캐스트도 차단하면 연결되지 않을 수 있습니다. 배포 후 사용자가 실물 Mac–Windows 연결·텍스트·이미지·한글 처리·300MB 파일 전송, 자동 재연결과 외부망 연결 성공을 보고했습니다. 기존 실패의 구체적인 원인과 성공한 발견 경로는 특정하지 않았습니다. 외부망의 UDP·NAT 제한도 유지됩니다.
 
 [검증 기록](https://github.com/limfrog/ClipSync/blob/main/docs/broadcast-discovery-verification.md) · [Mac–Windows 실물 검증 절차](https://github.com/limfrog/ClipSync/blob/main/docs/physical-verification.md)
 

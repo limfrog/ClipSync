@@ -42,7 +42,7 @@ Mac은 시스템 설정 → 개인정보 보호 및 보안 → 로컬 네트워�
 
 파일명은 UTF-8로 전달하고 NFC로 정규화해 macOS의 NFD 한글 자모 분리를 처리합니다. 파일 내용은 원본 바이트 그대로 보존하며 CP949/UTF-8이나 실행 파일 내용을 임의로 변환하지 않습니다. Windows 금지 문자·예약명은 저장 가능한 이름으로 바꿉니다.
 
-Electron의 `text/uri-list` API가 Windows `CF_HDROP`, macOS `NSFilenamesPboardType`, Linux의 파일 URI 목록을 매핑합니다. 이 클라우드에서는 Linux의 실제 클립보드로 자동 이미지·프로그램·500MB 동기화를 검증했습니다. Windows 탐색기·macOS Finder에서 실제 복사·붙여넣기는 각 OS의 추가 확인이 필요합니다.
+Electron의 `text/uri-list` API가 Windows `CF_HDROP`, macOS `NSFilenamesPboardType`, Linux의 파일 URI 목록을 매핑합니다. 이 클라우드에서는 Linux의 실제 클립보드로 자동 이미지·프로그램·500MB 동기화를 검증했습니다. 2026-10-21(한국시간) 사용자는 실물 Mac–Windows에서 양방향 텍스트·이미지·한글 처리·300MB 파일 전송, 앱 재실행 후 자동 재연결과 외부 네트워크 연결 성공을 보고했습니다. 각 항목의 범위는 [실물 검증 기록](docs/broadcast-discovery-verification.md)을 참고하세요.
 
 ## 개발
 
