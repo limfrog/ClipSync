@@ -27,6 +27,9 @@ jobs:
         shell: bash
         run: bash scripts/check-ci.sh test
       - run: npm run build
+      - name: Verify Windows native titlebar regions and connection restore
+        if: runner.os == 'Windows'
+        run: node scripts/test-desktop.mjs tests/desktop.persistence.ts
       - run: sudo apt-get update && sudo apt-get install -y xvfb gnome-keyring dbus-x11 openbox xdotool
         if: runner.os == 'Linux'
       - run: bash scripts/check-ci.sh test:desktop

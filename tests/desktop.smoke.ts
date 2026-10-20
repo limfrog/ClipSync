@@ -36,6 +36,8 @@ test('clipboard manager searches, pins, recopies, saves preferences, hides and s
   const dimensions = await page.evaluate(() => ({ width: innerWidth, overflow: document.documentElement.scrollWidth > innerWidth }));
   assert.equal(dimensions.width, 400);
   assert.equal(dimensions.overflow, false);
+  assert.equal(await page.locator('.header').evaluate(el => getComputedStyle(el).getPropertyValue('-webkit-app-region')), 'drag');
+  assert.equal(await page.locator('.devices-bar').evaluate(el => getComputedStyle(el).getPropertyValue('-webkit-app-region')), 'no-drag');
   assert.equal(await page.locator('.header-top').evaluate(el => getComputedStyle(el).getPropertyValue('-webkit-app-region')), 'drag');
   assert.equal(await page.locator('.toolbar').evaluate(el => getComputedStyle(el).getPropertyValue('-webkit-app-region')), 'no-drag');
   const before = await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getPosition());

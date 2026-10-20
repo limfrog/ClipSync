@@ -12,6 +12,30 @@ import { groupSession, type P2PSession } from '../src/main/group-session';
 import { until } from './helpers';
 import { localDHT } from './p2p-helpers';
 
+/** Check Windows' own non-client hit test, including display scaling, without relying
+ * on browser-injected pointer events (which do not exercise native window dragging). */
+async function windowsHeaderHitTest(app: ElectronApplication, points: { x: number; y: number; expected: number }[]) {
+  const native = await app.evaluate(({ BrowserWindow, screen }, values) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    const bounds = win.getContentBounds();
+    return { handle: win.getNativeWindowHandle().readBigUInt64LE().toString(), points: values.map(point => screen.dipToScreenPoint({ x: bounds.x + point.x, y: bounds.y + point.y })) };
+  }, points);
+  const commands = native.points.map(point => {
+    const packed = ((point.y & 0xffff) << 16) | (point.x & 0xffff);
+    return `[ClipSyncHitTest]::SendMessage([IntPtr]([long]'${native.handle}'), 132, [UIntPtr]::Zero, [IntPtr]([long]'${packed}')).ToInt64()`;
+  }).join('\n');
+  const script = `Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class ClipSyncHitTest {
+  [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr window, uint message, UIntPtr wParam, IntPtr lParam);
+}
+'@
+${commands}`;
+  const { stdout } = await promisify(execFile)('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { windowsHide: true, timeout: 15000 });
+  assert.deepEqual(stdout.trim().split(/\s+/).map(Number), points.map(point => point.expected), 'Windows must treat the title/top padding as HTCAPTION (2) and controls as HTCLIENT (1)');
+}
+
 test('native dragging, secure connection restore, hide keeps syncing, quit exits and disconnect stays forgotten', { timeout: 60000 }, async t => {
   const network = await localDHT();
   const profile = await mkdtemp(path.join(tmpdir(), 'clipsync-remember-'));
@@ -63,13 +87,31 @@ test('native dragging, secure connection restore, hide keeps syncing, quit exits
   assert.equal(stored.includes(password), false); assert.equal(stored.includes(groupKey), false);
   await first.page.getByRole('button', { name: '기기 연결 닫기', exact: true }).click();
   if (process.platform === 'linux') {
-    const [x, y] = await first.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getPosition());
-    await promisify(execFile)(process.env.CLIPSYNC_XDOTOOL ?? 'xdotool', ['mousemove', '--sync', String(x + 130), String(y + 22), 'sleep', '0.2', 'mousedown', '1', 'sleep', '0.2', 'mousemove', '--sync', String(x + 170), String(y + 42), 'sleep', '0.2', 'mousemove', '--sync', String(x + 210), String(y + 62), 'sleep', '0.2', 'mouseup', '1']);
-    await until(async () => {
-      const moved = await first.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getPosition());
-      return moved[0] !== x || moved[1] !== y;
-    }, 'Dragging the native title area did not move the window');
+    // Native pointer input exercises Electron's window drag hit testing, including the
+    // padding above the title and above the right-hand buttons (the reported dead area).
+    for (const point of [{ x: 130, y: 22 }, { x: 130, y: 6 }, { x: 330, y: 6 }]) {
+      const [x, y] = await first.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getPosition());
+      await promisify(execFile)(process.env.CLIPSYNC_XDOTOOL ?? 'xdotool', ['mousemove', '--sync', String(x + point.x), String(y + point.y), 'sleep', '0.2', 'mousedown', '1', 'sleep', '0.2', 'mousemove', '--sync', String(x + point.x + 15), String(y + point.y + 6), 'sleep', '0.2', 'mousemove', '--sync', String(x + point.x + 30), String(y + point.y + 12), 'sleep', '0.2', 'mouseup', '1']);
+      await until(async () => {
+        const moved = await first.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getPosition());
+        return moved[0] !== x || moved[1] !== y;
+      }, `Dragging the native header at (${point.x}, ${point.y}) did not move the window`);
+    }
+
   }
+  if (process.platform === 'win32') {
+    const settings = await first.page.locator('#open-settings').boundingBox();
+    const hide = await first.page.locator('#hide-window').boundingBox();
+    const devices = await first.page.locator('#devices').boundingBox();
+    assert.ok(settings && hide && devices);
+    await windowsHeaderHitTest(first.app, [
+      { x: 130, y: 22, expected: 2 },
+      { x: 130, y: 6, expected: 2 },
+      { x: 330, y: 6, expected: 2 },
+      ...[settings, hide, devices].map(box => ({ x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2), expected: 1 })),
+    ]);
+  }
+
   await delay(300);
   const position = await first.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getPosition());
   await first.page.getByRole('button', { name: '창 숨기기', exact: true }).click();

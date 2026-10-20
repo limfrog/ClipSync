@@ -89,11 +89,11 @@ npm run test:pair
 
 ## 설치 파일과 검증
 
-[GitHub Releases](https://github.com/limfrog/ClipSync/releases)에서 자기 OS/CPU에 맞는 설치 파일과 `SHA256SUMS.txt`를 받을 수 있습니다. `v0.4.4`는 내부 멀티캐스트·브로드캐스트 탐색을 병행하고 수신 단계별 진단을 제공하는 버전입니다. 양쪽 모두 0.4.4로 업데이트하세요. 0.4.0의 저장된 키·비밀번호는 유지합니다. 설치 전 기존 앱을 **종료**하세요. 배포자 인증서 서명과 Apple 공증은 포함하지 않습니다.
+[GitHub Releases](https://github.com/limfrog/ClipSync/releases)에서 자기 OS/CPU에 맞는 설치 파일과 `SHA256SUMS.txt`를 받을 수 있습니다. `v0.4.5`는 창 상단 여백에서도 드래그할 수 있도록 수정한 버전입니다. [새 아이콘 제안 세 가지](docs/icon-concepts.md)도 준비했습니다. 멀티캐스트·브로드캐스트·외부 P2P 탐색과 저장된 연결은 계속 사용합니다. 0.4.0의 저장된 키·비밀번호는 유지합니다. 설치 전 기존 앱을 **종료**하세요. 배포자 인증서 서명과 Apple 공증은 포함하지 않습니다.
 
 같은 공유기에 연결한 Mac과 Windows에서는 [실물 검증 절차](docs/physical-verification.md)를 따라 **연결 상태 복사** 보고서와 양방향 붙여넣기 결과를 비교할 수 있습니다.
 
-검증 범위와 결과는 [0.4.4 브로드캐스트 검증 기록](docs/broadcast-discovery-verification.md), [0.4.3 발견 속도 검증 기록](docs/discovery-verification.md) 및 [0.4.0 P2P 검증 기록](docs/p2p-verification.md), 빌드 설정은 [설치 프로그램 안내](docs/installers.md)를 참고하세요. 연결되지 않으면 모든 PC의 키·비밀번호·버전이 일치하는지, UDP와 공개 DHT 접근이 허용되는지 확인하세요. 일부 네트워크는 직접 P2P 연결을 지원하지 않습니다.
+검증 범위와 결과는 [0.4.5 창 이동 검증 기록](docs/window-drag-verification.md), [0.4.4 브로드캐스트 검증 기록](docs/broadcast-discovery-verification.md), [0.4.3 발견 속도 검증 기록](docs/discovery-verification.md) 및 [0.4.0 P2P 검증 기록](docs/p2p-verification.md), 빌드 설정은 [설치 프로그램 안내](docs/installers.md)를 참고하세요. 연결되지 않으면 모든 PC의 키·비밀번호·버전이 일치하는지, UDP와 공개 DHT 접근이 허용되는지 확인하세요. 일부 네트워크는 직접 P2P 연결을 지원하지 않습니다.
 
 ## 데이터 처리와 참고 원본
 
