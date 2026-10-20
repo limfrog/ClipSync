@@ -89,9 +89,9 @@ npm run test:pair
 
 ## 설치 파일과 검증
 
-[GitHub Releases](https://github.com/limfrog/ClipSync/releases)에서 자기 OS/CPU에 맞는 설치 파일과 `SHA256SUMS.txt`를 받을 수 있습니다. `v0.4.1`은 내부 네트워크 직접 탐색과 이전 기기 재접속을 개선한 버전입니다. 빠른 내부 연결은 양쪽 모두 0.4.1 이상이어야 합니다. 0.4.0의 저장된 키·비밀번호는 유지합니다. 설치 전 기존 앱을 **종료**하세요. 배포자 인증서 서명과 Apple 공증은 포함하지 않습니다.
+[GitHub Releases](https://github.com/limfrog/ClipSync/releases)에서 자기 OS/CPU에 맞는 설치 파일과 `SHA256SUMS.txt`를 받을 수 있습니다. `v0.4.2`은 내부 네트워크 직접 탐색과 이전 기기 재접속을 개선한 버전입니다. 빠른 내부 연결은 양쪽 모두 0.4.2 이상이어야 합니다. 0.4.0의 저장된 키·비밀번호는 유지합니다. 설치 전 기존 앱을 **종료**하세요. 배포자 인증서 서명과 Apple 공증은 포함하지 않습니다.
 
-검증 범위와 결과는 [0.4.1 발견 속도 검증 기록](docs/discovery-verification.md) 및 [0.4.0 P2P 검증 기록](docs/p2p-verification.md), 빌드 설정은 [설치 프로그램 안내](docs/installers.md)를 참고하세요. 연결되지 않으면 모든 PC의 키·비밀번호·버전이 일치하는지, UDP와 공개 DHT 접근이 허용되는지 확인하세요. 일부 네트워크는 직접 P2P 연결을 지원하지 않습니다.
+검증 범위와 결과는 [0.4.2 발견 속도 검증 기록](docs/discovery-verification.md) 및 [0.4.0 P2P 검증 기록](docs/p2p-verification.md), 빌드 설정은 [설치 프로그램 안내](docs/installers.md)를 참고하세요. 연결되지 않으면 모든 PC의 키·비밀번호·버전이 일치하는지, UDP와 공개 DHT 접근이 허용되는지 확인하세요. 일부 네트워크는 직접 P2P 연결을 지원하지 않습니다.
 
 ## 데이터 처리와 참고 원본
 

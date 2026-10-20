@@ -69,7 +69,9 @@ test('re-copying a received media history item synchronizes it back without a fe
   mediaA.current = await copied('기록에서 다시 복사.exe');
   await until(() => mediaB.writes === 1, 'Initial file did not synchronize', 5000);
   const record = b.state().history.find(item => item.mediaId)!;
-  mediaA.current = null; mediaB.current = null; textA.text = '파일 이후 복사한 텍스트';
+  // Only A makes a new copy. B's file clipboard is replaced when that text arrives;
+  // clearing B first would falsely resurrect its pre-file text in this test double.
+  mediaA.current = null; textA.text = '파일 이후 복사한 텍스트';
   await until(() => b.state().received === 1);
   await syncB.copy(record.id);
   await until(() => mediaA.writes === 1, 'History activation did not update the other clipboard', 5000);
