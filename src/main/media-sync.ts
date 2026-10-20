@@ -87,7 +87,9 @@ export class MediaSync {
             { id: batchId, index, count: captured.paths.length }, revision);
           this.sending.set(id, revision);
           let complete = false;
-          for (let attempts = 0; attempts < 3600 && !this.closed; attempts++) {
+          // Slow WAN transfers remain valid while acknowledged chunks make progress.
+          // TransferManager enforces an inactivity timeout instead of a fixed total duration.
+          while (!this.closed) {
             const transfer = this.controller.state().transfers.find(t => t.id === id);
             if (transfer?.status === 'completed') { complete = true; break; }
             if (!transfer || ['completed', 'cancelled', 'failed'].includes(transfer.status)) break;

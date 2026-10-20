@@ -23,9 +23,13 @@ jobs:
       - run: node node_modules/electron/install.js
       - run: npm test
       - run: npm run build
-      - run: sudo apt-get update && sudo apt-get install -y xvfb
+      - run: sudo apt-get update && sudo apt-get install -y xvfb gnome-keyring dbus-x11 openbox xdotool
         if: runner.os == 'Linux'
       - run: npm run test:desktop
+        if: runner.os == 'Linux'
+        env:
+          CLIPSYNC_TEST_NO_SANDBOX: '1'
+      - run: npm run test:persistence
         if: runner.os == 'Linux'
         env:
           CLIPSYNC_TEST_NO_SANDBOX: '1'

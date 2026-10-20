@@ -1,6 +1,7 @@
 import './style.css';
 import type { ClipSyncAPI, Result, SyncState } from '../shared/api';
 import { DEFAULT_PREFERENCES, type HistoryItem, type Preferences } from '../shared/history';
+import type { ConnectionInfo } from '../shared/group';
 import type { TransferState } from '../shared/transfers';
 
 declare global { interface Window { clipSync: ClipSyncAPI } }
@@ -55,12 +56,12 @@ function updatePreferences(value: Preferences) {
 function render(state: SyncState) {
   current = state;
   const connected = state.mode !== 'idle';
-  element('status').textContent = state.paused ? '동기화 일시정지' : state.peers ? `${state.peers}대 연결됨` : connected ? '다른 PC 대기 중' : '연결 대기';
+  element('status').textContent = state.paused ? '동기화 일시정지' : state.peers ? `${state.peers}대 P2P 연결` : state.groupStatus === 'reconnecting' ? '자동 재연결 중' : connected ? 'P2P 기기 찾는 중' : '연결 대기';
   element('status').classList.toggle('connected', connected && !state.paused);
-  element('connection-grid').hidden = connected;
-  element('invitation-panel').hidden = state.mode !== 'hosting';
+  element('group-form').hidden = connected;
+  element('group-panel').hidden = !connected;
   element('session-actions').hidden = !connected;
-  element('session-title').textContent = state.paused ? '재개한 뒤 새로 복사하는 내용부터 동기화합니다.' : '텍스트·이미지·파일 클립보드를 자동으로 동기화합니다.';
+  element('session-title').textContent = state.paused ? '재개한 뒤 새로 복사하는 내용부터 동기화합니다.' : state.peers ? 'PC끼리 클립보드를 직접 동기화합니다. 다른 PC가 종료돼도 이 연결은 유지됩니다.' : '같은 키와 비밀번호를 입력한 PC를 자동으로 찾고 있습니다.';
   element('pause').textContent = state.paused ? '동기화 재개' : '일시정지';
   for (const [id, value] of [['peer-count', state.peers], ['sent-count', state.sent], ['received-count', state.received]] as const) element(id).textContent = String(value);
   showError(state.error);
@@ -143,7 +144,10 @@ function renderHistory() {
 }
 
 for (const id of ['open-connection', 'open-settings']) element(id).addEventListener('click', () => {
-  if (id === 'open-connection') connection.showModal();
+  if (id === 'open-connection') {
+    connection.showModal();
+    void window.clipSync.connection().then(updateConnection).catch(() => showError('연결 정보를 읽을 수 없습니다.'));
+  }
   else {
     element<HTMLSelectElement>('theme').value = preferences.theme;
     element<HTMLInputElement>('shortcut-setting').value = preferences.shortcut;
@@ -158,14 +162,26 @@ document.querySelectorAll<HTMLButtonElement>('[data-filter]').forEach(button => 
   document.querySelectorAll('[data-filter]').forEach(tab => tab.setAttribute('aria-selected', String(tab === button)));
   renderHistory();
 }));
-element('host').addEventListener('click', () => { void act(() => window.clipSync.host()); });
-element('join-form').addEventListener('submit', event => {
-  event.preventDefault(); const code = element<HTMLInputElement>('invitation').value.trim();
-  void act(async () => { const result = await window.clipSync.join(code); if (result.ok) { element<HTMLInputElement>('invitation').value = ''; connection.close(); } return result; });
+function updateConnection(value: ConnectionInfo) {
+  element('group-key-display').textContent = value.groupKey;
+  element('remember-status').textContent = value.remembered ? '보안 저장됨 · 다음 실행에도 자동 연결' : '이번 실행에서 연결 중 · 보안 저장소를 사용할 수 없으면 재실행 후 다시 입력해야 합니다.';
+  if (!current || current.mode === 'idle') element<HTMLInputElement>('group-key').value = value.groupKey;
+}
+element('generate-key').addEventListener('click', () => {
+  void window.clipSync.createGroupKey().then(key => { element<HTMLInputElement>('group-key').value = key; }).catch(() => showError('연결 키를 만들 수 없습니다.'));
 });
-element('copy-invitation').addEventListener('click', () => { void act(() => window.clipSync.copyInvitation(), '초대 코드를 복사했어요. 신뢰하는 PC에 전달하세요.'); });
+element('group-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const input = { groupKey: element<HTMLInputElement>('group-key').value.trim(), password: element<HTMLInputElement>('group-password').value };
+  void act(async () => {
+    const result = await window.clipSync.connectGroup(input);
+    if (result.ok) { element<HTMLInputElement>('group-password').value = ''; updateConnection(await window.clipSync.connection()); }
+    return result;
+  });
+});
+element('copy-group-key').addEventListener('click', () => { void act(() => window.clipSync.copyGroupKey(), '연결 키를 복사했어요. 비밀번호도 별도로 전달하세요.'); });
 element('pause').addEventListener('click', () => { void act(() => window.clipSync.pause(!current.paused)); });
-element('disconnect').addEventListener('click', () => { void act(() => window.clipSync.disconnect()); });
+element('disconnect').addEventListener('click', () => { void act(async () => { const result = await window.clipSync.disconnect(); if (result.ok) { updateConnection({ groupKey: '', remembered: false }); element<HTMLInputElement>('group-password').value = ''; } return result; }); });
 element('settings-form').addEventListener('submit', event => {
   event.preventDefault();
   void act(async () => {
@@ -195,4 +211,4 @@ function dispatchAction(event: MouseEvent) {
 }
 window.clipSync.subscribe(render);
 window.clipSync.onPreferences(updatePreferences);
-void Promise.all([window.clipSync.state().then(render), window.clipSync.preferences().then(updatePreferences)]).catch(() => showError('앱을 다시 실행해 주세요.'));
+void Promise.all([window.clipSync.state().then(render), window.clipSync.preferences().then(updatePreferences), window.clipSync.connection().then(updateConnection)]).catch(() => showError('앱을 다시 실행해 주세요.'));

@@ -10,6 +10,10 @@ function decodeState(state: Omit<SyncState, 'history'> & { history?: SyncState['
 }
 
 const api: ClipSyncAPI = {
+  connection: () => ipcRenderer.invoke('clipsync:connection'),
+  createGroupKey: () => ipcRenderer.invoke('clipsync:create-group-key'),
+  connectGroup: input => ipcRenderer.invoke('clipsync:connect-group', input),
+  copyGroupKey: () => ipcRenderer.invoke('clipsync:copy-group-key'),
   preferences: () => ipcRenderer.invoke('clipsync:preferences'),
   configure: preferences => ipcRenderer.invoke('clipsync:configure', preferences),
   history: (action, id) => ipcRenderer.invoke('clipsync:history', action, id),
@@ -22,11 +26,8 @@ const api: ClipSyncAPI = {
     return () => ipcRenderer.removeListener('clipsync:preferences', handler);
   },
   state: async () => decodeState(await ipcRenderer.invoke('clipsync:get-state')),
-  host: () => ipcRenderer.invoke('clipsync:host'),
-  join: invitation => ipcRenderer.invoke('clipsync:join', invitation),
   disconnect: () => ipcRenderer.invoke('clipsync:disconnect'),
   pause: paused => ipcRenderer.invoke('clipsync:pause', paused),
-  copyInvitation: () => ipcRenderer.invoke('clipsync:copy-invitation'),
   chooseFile: peerId => ipcRenderer.invoke('clipsync:choose-file', peerId),
   sendImage: peerId => ipcRenderer.invoke('clipsync:send-image', peerId),
   acceptTransfer: id => ipcRenderer.invoke('clipsync:accept-transfer', id),

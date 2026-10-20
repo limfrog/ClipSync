@@ -2,11 +2,13 @@ module.exports = {
   appId: 'dev.limfrog.clipsync',
   productName: 'ClipSync',
   directories: { output: 'release/installers' },
-  files: ['dist/**/*', 'package.json', 'THIRD_PARTY_NOTICES.txt'],
+  files: ['dist/**/*', 'package.json', 'THIRD_PARTY_NOTICES.txt', '!node_modules/**/prebuilds/**/*.bare'],
   asar: true,
+  asarUnpack: ['node_modules/**/prebuilds/**/*'],
   npmRebuild: false,
   publish: null,
   win: {
+    files: ['!node_modules/**/prebuilds/{android-*,ios-*,linux-*,darwin-*}/**/*'],
     target: [{ target: 'nsis', arch: ['x64'] }],
     artifactName: 'ClipSync-${version}-Windows-${arch}-Setup.${ext}',
     signAndEditExecutable: false,
@@ -25,6 +27,7 @@ module.exports = {
     uninstallDisplayName: 'ClipSync',
   },
   mac: {
+    files: ['!node_modules/**/prebuilds/{android-*,ios-*,linux-*,win32-*}/**/*'],
     target: [{ target: 'pkg', arch: ['arm64', 'x64'] }],
     category: 'public.app-category.utilities',
     identity: '-',

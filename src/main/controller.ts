@@ -6,6 +6,8 @@ import { TransferManager } from './transfers';
 import type { ClipboardBatch, Peer, TransferPacket } from '../shared/transfers';
 import type { HistoryItem } from '../shared/history';
 import { ClipboardHistory } from './history';
+import type { GroupCredentials } from '../shared/group';
+import { groupSession, type P2POptions } from './group-session';
 
 export interface Clipboard { readText(): string | null | Promise<string | null>; writeText(text: string): void | Promise<void> }
 
@@ -17,6 +19,8 @@ export class SyncController {
   private readonly savedFiles = new Map<string, { path: string; image: boolean }>();
   private lastText: string | null = null;
   private connecting = false;
+  private generation = 0;
+  private readonly privateTexts = new Set<string>();
   private polling = false;
   private clipboardQueue = Promise.resolve();
   private readonly timer: ReturnType<typeof setInterval>;
@@ -46,8 +50,9 @@ export class SyncController {
 
   private readonly callbacks = {
     onText: (text: string, localEcho = false) => {
+      const generation = this.generation;
       void this.enqueue(async () => {
-        if (!this.session || this.current.paused) return;
+        if (!this.session || this.current.paused || generation !== this.generation) return;
         await this.clipboard.writeText(text);
         this.lastText = text;
         if (!localEcho) {
@@ -115,12 +120,33 @@ export class SyncController {
     });
   }
 
+  async connectGroup(credentials: GroupCredentials, options: P2POptions = {}) {
+    this.privateTexts.add(credentials.groupKey);
+    await this.connect(async () => {
+      const generation = ++this.generation;
+      const guarded = <A extends unknown[]>(callback: (...args: A) => void) => (...args: A) => { if (generation === this.generation) callback(...args); };
+      this.session = groupSession(credentials, {
+        onText: guarded(this.callbacks.onText), onPeers: guarded(this.callbacks.onPeers),
+        onDevices: guarded(this.callbacks.onDevices), onTransfer: guarded(this.callbacks.onTransfer),
+        onStatus: guarded((groupStatus, error) => this.update({ groupStatus, error: error ?? null })),
+      }, options);
+      this.update({ mode: 'group', groupStatus: 'discovering', invitation: '' });
+    });
+  }
+
+  protectText(text: string) { this.privateTexts.add(text); if (this.privateTexts.size > 32) this.privateTexts.delete(this.privateTexts.values().next().value!); }
+  async copyGroupKey(key: string) {
+    this.privateTexts.add(key);
+    await this.enqueue(async () => { await this.clipboard.writeText(key); this.lastText = key; });
+  }
+
   async disconnect(error: string | null = null) {
+    this.generation++;
     const session = this.session;
     const files = this.files;
     this.session = null;
     this.files = null;
-    this.update({ mode: 'idle', peers: 0, invitation: '', paused: false, error, devices: [] });
+    this.update({ mode: 'idle', groupStatus: undefined, peers: 0, invitation: '', paused: false, error, devices: [] });
     await files?.abortAll();
     await session?.close();
   }
@@ -215,7 +241,7 @@ export class SyncController {
         const text = await this.clipboard.readText();
         if (this.current.paused || text === null || text === this.lastText) return;
         this.lastText = text;
-        if (text.startsWith('clipsync://')) return;
+        if (text.startsWith('clipsync://') || this.privateTexts.has(text)) return;
         if (Buffer.byteLength(text, 'utf8') > MAX_TEXT_BYTES) {
           this.update({ error: '1MB를 초과한 텍스트는 건너뛰었습니다.' });
           return;

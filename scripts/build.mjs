@@ -11,7 +11,7 @@ await bundle({
   platform: 'node',
   format: 'cjs',
   target: 'node22',
-  external: ['electron'],
+  external: ['electron', 'hyperswarm'],
   sourcemap: true,
 });
 await renderer({

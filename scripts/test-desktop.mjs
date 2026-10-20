@@ -17,7 +17,7 @@ try {
       displayServer.once('exit', code => { clearTimeout(timeout); reject(new Error(`Xvfb exited: ${code}`)); });
     });
   }
-  const runner = spawn(process.execPath, ['--import', 'tsx', '--test', 'tests/desktop.smoke.ts'], { env, stdio: 'inherit' });
+  const runner = spawn(process.execPath, ['--import', 'tsx', '--test', process.argv[2] ?? 'tests/desktop.smoke.ts'], { env, stdio: 'inherit' });
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => runner.kill(signal));
   process.exitCode = await new Promise((resolve, reject) => {
     runner.once('error', reject);

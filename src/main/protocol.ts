@@ -6,7 +6,7 @@ export const MAX_TEXT_BYTES = 1024 * 1024;
 export const DEFAULT_PORT = 47832;
 
 export interface Invitation { host: string; port: number; key: string }
-export interface ClipboardMessage { id: string; text: string; transfer?: TransferPacket; from?: string; to?: string }
+export interface ClipboardMessage { id: string; text: string; transfer?: TransferPacket; from?: string; to?: string; clock?: number }
 
 export function createKey(): string {
   return randomBytes(32).toString('base64url');
@@ -60,6 +60,11 @@ export function sealTransfer(key: string, transfer: TransferPacket, from: string
   return encrypt(key, { id, text: '', transfer, from, to });
 }
 
+export function sealGroupText(key: string, text: string, clock: number, from: string): string {
+  if (Buffer.byteLength(text, 'utf8') > MAX_TEXT_BYTES) throw new Error('1MB 이하의 텍스트만 동기화할 수 있습니다.');
+  return encrypt(key, { id: randomUUID(), text, clock, from });
+}
+
 function encrypt(key: string, message: ClipboardMessage): string {
   const nonce = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', keyBuffer(key), nonce);
@@ -83,6 +88,10 @@ export function open(key: string, wire: string): ClipboardMessage {
     if (!isTransferPacket(message.transfer) || typeof message.from !== 'string' || typeof message.to !== 'string' ||
         !/^(host|[0-9a-f-]{36})$/.test(message.from) || !/^(host|[0-9a-f-]{36})$/.test(message.to)) throw new Error('Invalid transfer routing');
     return { id: message.id, text: '', transfer: message.transfer, from: message.from, to: message.to };
+  }
+  if (message.clock !== undefined) {
+    if (!Number.isSafeInteger(message.clock) || message.clock < 1 || typeof message.from !== 'string' || !/^[0-9a-f-]{36}$/.test(message.from)) throw new Error('Invalid group ordering');
+    return { id: message.id, text: message.text, clock: message.clock, from: message.from };
   }
   return { id: message.id, text: message.text };
 }

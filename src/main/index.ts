@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, nativeImage, screen, shell, Tray } from 'electron';
+import { app, BrowserWindow, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, nativeImage, safeStorage, screen, shell, Tray } from 'electron';
 import path from 'node:path';
 import { createWriteStream, openAsBlob } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
@@ -10,6 +10,9 @@ import { MAX_FILE_BYTES } from '../shared/transfers';
 import { DEFAULT_PREFERENCES, type Preferences } from '../shared/history';
 import { NativeMediaClipboard } from './clipboard-media';
 import { MediaSync } from './media-sync';
+import { ConnectionStore } from './connection-store';
+import { createGroupKey, deriveGroup } from './group-credentials';
+import type { GroupCredentials, GroupInput } from '../shared/group';
 
 let window: BrowserWindow | null = null;
 let controller: SyncController;
@@ -21,6 +24,12 @@ let nativeDialogDepth = 0;
 let media: MediaSync | undefined;
 let lastHistorySent = -1;
 let settingsQueue = Promise.resolve();
+let connectionQueue = Promise.resolve();
+let connectionStore: ConnectionStore;
+let savedGroup: GroupCredentials | null = null;
+let remembered = false;
+let position: { x: number; y: number } | undefined;
+let positionTimer: ReturnType<typeof setTimeout> | undefined;
 const imageCachePath = async () => imageCache ??= await mkdtemp(path.join(app.getPath('temp'), 'clipsync-images-'));
 
 function validatePreferences(value: unknown): Preferences {
@@ -38,8 +47,30 @@ const currentPreferences = () => ({ ...preferences, shortcutAvailable: globalSho
 
 function toggleWindow() {
   if (!window || window.isDestroyed()) createWindow();
-  else if (window.isVisible() && window.isFocused()) window.hide();
+  else if (window.isVisible() && window.isFocused()) hideWindow();
   else { window.show(); window.focus(); }
+}
+
+function hideWindow() {
+  if (tray) window?.hide(); else window?.minimize();
+}
+
+function p2pOptions() {
+  // Custom discovery nodes support private deployments and isolated integration tests.
+  const bootstrap = process.env.CLIPSYNC_DHT_BOOTSTRAP?.split(',').map(value => value.trim()).filter(Boolean);
+  return bootstrap?.length ? { bootstrap } : {};
+}
+
+function connectionInfo() { return { groupKey: savedGroup?.groupKey ?? '', remembered }; }
+
+async function connectGroup(input: GroupInput) {
+  if (controller.state().mode !== 'idle') throw new Error('기존 연결을 해제한 뒤 새 키를 설정해 주세요.');
+  const credentials = await deriveGroup(input);
+  remembered = await connectionStore.save(credentials);
+  savedGroup = credentials;
+  controller.protectText(input.password);
+  await controller.connectGroup(credentials, p2pOptions());
+  if (!remembered) controller.reportError('운영체제 보안 저장소를 사용할 수 없어 이번 실행에서만 연결합니다. 재실행 후에는 키와 비밀번호를 다시 입력해야 합니다.');
 }
 
 function createTray() {
@@ -90,7 +121,8 @@ function createWindow() {
   lastHistorySent = -1;
   window = new BrowserWindow({
     width: 400, height: Math.min(760, screen.getPrimaryDisplay().workArea.height - 30),
-    minWidth: 380, minHeight: 500, frame: false, resizable: false, fullscreenable: false,
+    minWidth: 380, minHeight: 500, frame: false, movable: true, resizable: false, fullscreenable: false,
+    ...(position ?? {}),
     alwaysOnTop: preferences.alwaysOnTop, skipTaskbar: Boolean(tray),
     title: 'ClipSync', backgroundColor: '#09090b',
     webPreferences: {
@@ -102,9 +134,19 @@ function createWindow() {
   window.webContents.on('will-navigate', event => event.preventDefault());
   window.webContents.on('will-attach-webview', event => event.preventDefault());
   void window.loadFile(path.join(__dirname, 'renderer/index.html'));
-  window.on('close', event => { if (!quitting && tray) { event.preventDefault(); window?.hide(); } });
+  window.on('show', () => { if (process.platform === 'darwin') void app.dock?.show(); });
+  window.on('hide', () => { if (process.platform === 'darwin' && tray && !quitting) app.dock?.hide(); });
+  window.on('move', () => {
+    if (!window) return;
+    const [x, y] = window.getPosition(); position = { x, y };
+    clearTimeout(positionTimer);
+    positionTimer = setTimeout(() => {
+      void mkdir(app.getPath('userData'), { recursive: true }).then(() => writeFile(path.join(app.getPath('userData'), 'window-position.json'), JSON.stringify(position), { mode: 0o600 })).catch(() => {});
+    }, 200);
+  });
+  window.on('close', event => { if (!quitting && tray) { event.preventDefault(); hideWindow(); } });
   window.on('blur', () => {
-    if (tray && !preferences.alwaysOnTop && !nativeDialogDepth && !window?.webContents.isDevToolsOpened()) window?.hide();
+    if (tray && !preferences.alwaysOnTop && !nativeDialogDepth && !window?.webContents.isDevToolsOpened()) hideWindow();
   });
   window.on('closed', () => { window = null; });
 }
@@ -112,6 +154,14 @@ function createWindow() {
 void app.whenReady().then(async () => {
   try { preferences = validatePreferences(JSON.parse(await readFile(preferencesPath(), 'utf8'))); }
   catch { preferences = { ...DEFAULT_PREFERENCES }; }
+  try {
+    const value = JSON.parse(await readFile(path.join(app.getPath('userData'), 'window-position.json'), 'utf8'));
+    if (Number.isInteger(value.x) && Number.isInteger(value.y) && screen.getAllDisplays().some(({ workArea: r }) => value.x >= r.x && value.x + 400 <= r.x + r.width && value.y >= r.y && value.y + 80 <= r.y + r.height)) position = { x: value.x, y: value.y };
+  } catch { /* First launch or a disconnected display uses the default position. */ }
+  connectionStore = new ConnectionStore(path.join(app.getPath('userData'), 'connection.enc'), {
+    available: () => safeStorage.isEncryptionAvailable() && (process.platform !== 'linux' || safeStorage.getSelectedStorageBackend() !== 'basic_text'),
+    encrypt: text => safeStorage.encryptString(text), decrypt: data => safeStorage.decryptString(data),
+  });
   Menu.setApplicationMenu(process.platform === 'darwin' ? Menu.buildFromTemplate([
     { role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' },
   ]) : Menu.buildFromTemplate([{ role: 'editMenu' }, { role: 'windowMenu' }]));
@@ -130,6 +180,9 @@ void app.whenReady().then(async () => {
   media = new MediaSync(controller, new NativeMediaClipboard(imageCachePath), path.join(process.env.CLIPSYNC_DATA_DIR ?? app.getPath('downloads'), 'ClipSync'));
   ipcMain.handle('clipsync:get-state', () => controller.state());
   ipcMain.handle('clipsync:preferences', () => currentPreferences());
+  const trusted = (event: Electron.IpcMainInvokeEvent) => window && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame;
+  ipcMain.handle('clipsync:connection', event => { if (!trusted(event)) throw new Error('허용되지 않은 창입니다.'); return connectionInfo(); });
+  ipcMain.handle('clipsync:create-group-key', event => { if (!trusted(event)) throw new Error('허용되지 않은 창입니다.'); return createGroupKey(); });
   const actions: Record<string, (...args: never[]) => unknown> = {
     configure: (value: unknown) => {
       const work = settingsQueue.then(() => configure(value));
@@ -137,7 +190,7 @@ void app.whenReady().then(async () => {
       return work;
     },
     history: (action: string, id?: string) => action === 'copy' && controller.state().history.some(item => item.id === id && item.mediaId) ? media!.copy(id!) : controller.manageHistory(action, id),
-    hide: () => { if (tray) window?.hide(); else window?.minimize(); },
+    hide: hideWindow,
     quit: () => { setImmediate(() => app.quit()); },
     'open-downloads': async () => {
       const folder = path.join(process.env.CLIPSYNC_DATA_DIR ?? app.getPath('downloads'), 'ClipSync');
@@ -145,11 +198,16 @@ void app.whenReady().then(async () => {
       const error = await shell.openPath(folder);
       if (error) throw new Error(error);
     },
-    host: () => controller.host(),
-    join: (code: string) => controller.join(code),
-    disconnect: () => controller.disconnect(),
+    'connect-group': (input: GroupInput) => {
+      const work = connectionQueue.then(() => connectGroup(input)); connectionQueue = work.catch(() => {}); return work;
+    },
+    'copy-group-key': () => { if (!savedGroup) throw new Error('먼저 기기를 연결해 주세요.'); return controller.copyGroupKey(savedGroup.groupKey); },
+    disconnect: () => {
+      const work = connectionQueue.then(async () => {
+        await connectionStore.clear(); savedGroup = null; remembered = false; await controller.disconnect();
+      }); connectionQueue = work.catch(() => {}); return work;
+    },
     pause: (paused: boolean) => controller.pause(paused),
-    'copy-invitation': () => controller.copyInvitation(),
     'choose-file': async (peerId: string) => {
       const result = await nativeDialog(() => dialog.showOpenDialog(window!, { title: '보낼 파일 선택 · 최대 500MB', properties: ['openFile'] }));
       if (!result.canceled && result.filePaths[0]) await controller.sendFile(result.filePaths[0], peerId);
@@ -192,6 +250,10 @@ void app.whenReady().then(async () => {
   createTray();
   globalShortcut.register(preferences.shortcut, toggleWindow);
   createWindow();
+  try {
+    const saved = await connectionStore.load();
+    if (saved) { savedGroup = saved; remembered = true; await controller.connectGroup(saved, p2pOptions()); }
+  } catch { controller.reportError('저장된 연결 정보를 복원하지 못했습니다. 운영체제 보안 저장소를 확인하거나 연결을 다시 설정해 주세요.'); }
   app.on('activate', () => { if (!window) createWindow(); window?.show(); window?.focus(); });
 });
 
@@ -203,10 +265,11 @@ app.on('before-quit', event => {
   if (quitting || !controller) return;
   event.preventDefault();
   quitting = true;
+  clearTimeout(positionTimer);
   globalShortcut.unregisterAll();
   tray?.destroy();
   tray = null;
-  void controller.dispose().finally(async () => {
+  void connectionQueue.catch(() => {}).then(() => controller.dispose()).finally(async () => {
     await media?.dispose();
     try { if (imageCache) await rm(imageCache, { recursive: true, force: true }); }
     finally { app.quit(); }

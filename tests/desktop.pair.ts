@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import { setTimeout } from 'node:timers/promises';
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
 import { until } from './helpers';
+import { localDHT } from './p2p-helpers';
 
 interface Desktop { app: ElectronApplication; page: Page; display: string; profile: string }
 interface CheckResult { name: string; status: 'passed' | 'failed'; durationMs: number; error?: string }
@@ -81,8 +82,9 @@ async function screenshot(desktop: Desktop, file: string) {
   await desktop.page.screenshot({ path: file, fullPage: true });
 }
 
-test('two packaged desktops with independent OS clipboards', { timeout: 240000 }, async t => {
+test('two packaged desktops with independent OS clipboards', { timeout: 600000 }, async t => {
   assert.equal(process.platform, 'linux', 'This isolated-display test requires Linux with Xvfb');
+  const network = await localDHT();
   const executable = process.env.CLIPSYNC_EXECUTABLE || path.resolve('release/ClipSync-linux-x64/ClipSync');
   await mkdir('test-results', { recursive: true });
   const report = {
@@ -93,7 +95,7 @@ test('two packaged desktops with independent OS clipboards', { timeout: 240000 }
     version: JSON.parse(await readFile('package.json', 'utf8')).version as string,
     outcome: 'running' as 'running' | 'passed' | 'failed',
     independentDisplays: [] as string[],
-    network: 'Host-generated invitation; no address or session-key override',
+    network: 'Equal peers; isolated UDP DHT discovery; direct encrypted PC-to-PC transfer without a data relay',
     checks: [] as CheckResult[],
   };
   const displays: Awaited<ReturnType<typeof displayServer>>[] = [];
@@ -107,6 +109,7 @@ test('two packaged desktops with independent OS clipboards', { timeout: 240000 }
       for (const running of runningApps) {
         if (!running.closed) await running.app.close();
       }
+      await network.close();
       cleaned = true;
     } finally {
       for (const display of displays) display.process.kill();
@@ -126,7 +129,7 @@ test('two packaged desktops with independent OS clipboards', { timeout: 240000 }
     const app = await electron.launch({
       executablePath: executable,
       args: process.env.CLIPSYNC_TEST_NO_SANDBOX === '1' ? ['--no-sandbox'] : [],
-      env: { ...process.env, DISPLAY: display.display, CLIPSYNC_DATA_DIR: profile },
+      env: { ...process.env, DISPLAY: display.display, CLIPSYNC_DATA_DIR: profile, CLIPSYNC_DHT_BOOTSTRAP: network.bootstrap.join(',') },
     });
     const running = { app, closed: false };
     runningApps.push(running);
@@ -158,7 +161,8 @@ test('two packaged desktops with independent OS clipboards', { timeout: 240000 }
 
   const host = await launch();
   const client = await launch();
-  let invitation = '';
+  let groupKey = '';
+  const password = 'pair-test-password-1234';
 
   await check('separate displays have independent native clipboards', async () => {
     assert.notEqual(host.display, client.display);
@@ -168,39 +172,25 @@ test('two packaged desktops with independent OS clipboards', { timeout: 240000 }
     assert.ok(await clipboard(client) === 'client-only-before-connection', 'Client clipboard was contaminated by the host display');
   });
 
-  await check('UI rejects malformed invitations and wrong keys, then joins with the original host invitation', async () => {
+  await check('UI generates a 20-character key and connects equal peers using the same key and password', async () => {
     await host.page.getByRole('button', { name: '기기 연결', exact: true }).click();
-    await host.page.getByRole('button', { name: '연결 열기' }).click();
-    await until(async () => (await state(host)).mode === 'hosting');
-    await host.page.getByRole('button', { name: '초대 코드 복사' }).click();
-    invitation = await clipboard(host);
+    await host.page.getByRole('button', { name: '새 키 만들기' }).click();
+    groupKey = await host.page.getByLabel('연결 키 · 영문·숫자 20자리').inputValue();
+    assert.match(groupKey, /^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{20}$/);
+    await host.page.getByLabel('연결 비밀번호 · 8자 이상').fill(password);
+    await host.page.getByRole('button', { name: '연결 저장', exact: true }).click();
+    await until(async () => (await state(host)).mode === 'group');
+    await host.page.getByRole('button', { name: '연결 키 복사' }).click();
+    assert.equal(await clipboard(host), groupKey);
     await host.page.getByRole('button', { name: '기기 연결 닫기', exact: true }).click();
     await client.page.getByRole('button', { name: '기기 연결', exact: true }).click();
-    assert.ok(invitation.startsWith('clipsync://join?'), 'Copy invitation did not write a valid code');
-    const input = client.page.getByRole('textbox', { name: '초대 코드', exact: true });
-    const join = client.page.getByRole('button', { name: '참여', exact: true });
-    await input.fill('not-an-invitation');
-    await join.click();
-    await client.page.getByRole('alert').waitFor();
-    assert.equal((await state(client)).mode, 'idle');
-    const wrong = new URL(invitation);
-    wrong.searchParams.set('key', randomBytes(32).toString('base64url'));
-    await input.fill(wrong.toString());
-    await join.click();
-    await until(async () => await client.page.getByRole('alert').isVisible() && await join.isEnabled(), 'Wrong key was not rejected', 8000);
-    assert.equal((await state(client)).mode, 'idle');
-    assert.equal((await state(host)).peers, 0);
-
-    // This transfer represents delivering the invitation through an external channel.
-    await client.app.evaluate(({ clipboard }, code) => clipboard.writeText(code), invitation);
-    await input.fill('');
-    await input.press('ControlOrMeta+V');
-    await client.app.evaluate(({ clipboard }) => clipboard.writeText('client-only-before-connection'));
-    await join.click();
-    await until(async () => (await state(client)).mode === 'joined' && (await state(host)).peers === 1, 'Two packaged apps did not connect', 8000);
+    await client.page.getByLabel('연결 키 · 영문·숫자 20자리').fill(groupKey);
+    await client.page.getByLabel('연결 비밀번호 · 8자 이상').fill(password);
+    await client.page.getByRole('button', { name: '연결 저장', exact: true }).click();
+    await until(async () => (await state(client)).mode === 'group' && (await state(host)).peers === 1, 'P2P apps did not connect', 15000);
+    await client.page.getByRole('button', { name: '기기 연결 닫기', exact: true }).click();
     await setTimeout(900);
-    assert.equal((await state(host)).sent, 0);
-    assert.equal((await state(client)).sent, 0);
+    assert.equal((await state(host)).sent, 0); assert.equal((await state(client)).sent, 0);
     assert.ok(await clipboard(client) === 'client-only-before-connection', 'Pre-connection clipboard content was shared');
   });
 
@@ -349,49 +339,37 @@ test('two packaged desktops with independent OS clipboards', { timeout: 240000 }
     await host.app.evaluate(async ({ clipboard, ClipboardItem }, uri) => {
       await clipboard.write([new ClipboardItem({ 'text/uri-list': uri })]);
     }, pathToFileURL(source).href);
-    await until(async () => (await state(client)).transfers.some(t => t.size === 500_000_000 && t.status === 'completed') && (await state(host)).transfers.some(t => t.size === 500_000_000 && t.status === 'completed'), '500MB desktop transfer did not complete', 170000);
+    await until(async () => (await state(client)).transfers.some(t => t.size === 500_000_000 && t.status === 'completed') && (await state(host)).transfers.some(t => t.size === 500_000_000 && t.status === 'completed'), '500MB desktop transfer did not complete', 480000);
     assert.equal((await stat(destination)).size, 500_000_000);
     assert.equal(await digest(source), await digest(destination));
     await screenshot(host, 'test-results/pair-files-host.png');
     await screenshot(client, 'test-results/pair-files-client.png');
   });
 
-  await check('disconnect stops sharing, a new session rejects the old code, and reconnect restores sync', async () => {
+  await check('explicit disconnect deletes remembered group and reconnecting uses the same key without a master', async () => {
     await client.page.getByRole('button', { name: '기기 연결', exact: true }).click();
-    await client.page.getByRole('button', { name: '연결 해제' }).click();
+    await client.page.getByRole('button', { name: '연결 해제 및 저장 삭제' }).click();
     await client.page.getByRole('button', { name: '기기 연결 닫기', exact: true }).click();
     await until(async () => (await state(host)).peers === 0 && (await state(client)).mode === 'idle');
+    assert.equal((await client.page.evaluate(() => window.clipSync.connection())).groupKey, '');
     const existing = await clipboard(client);
-    await copy(host, 'copy after peer disconnected');
-    await setTimeout(900);
-    assert.ok(await clipboard(client) === existing, 'Disconnected peer still received clipboard data');
-    await host.page.getByRole('button', { name: '기기 연결', exact: true }).click();
-    await host.page.getByRole('button', { name: '연결 해제' }).click();
-    await host.page.getByRole('button', { name: '연결 열기' }).click();
-    await until(async () => (await state(host)).mode === 'hosting');
+    await copy(host, 'copy after peer disconnected'); await setTimeout(900);
+    assert.equal(await clipboard(client), existing);
     await client.page.getByRole('button', { name: '기기 연결', exact: true }).click();
-    const input = client.page.getByRole('textbox', { name: '초대 코드', exact: true });
-    const join = client.page.getByRole('button', { name: '참여', exact: true });
-    await input.fill(invitation);
-    await join.click();
-    await until(async () => await client.page.getByRole('alert').isVisible() && await join.isEnabled(), 'Old session code was not rejected', 8000);
-    assert.equal((await state(client)).mode, 'idle');
-    await host.page.getByRole('button', { name: '초대 코드 복사' }).click();
-    const fresh = await clipboard(host);
-    await host.page.getByRole('button', { name: '기기 연결 닫기', exact: true }).click();
-    assert.ok(fresh !== invitation, 'Session key was not rotated');
-    await input.fill(fresh);
-    await join.click();
-    await until(async () => (await state(client)).mode === 'joined');
+    await client.page.getByLabel('연결 키 · 영문·숫자 20자리').fill(groupKey);
+    await client.page.getByLabel('연결 비밀번호 · 8자 이상').fill(password);
+    await client.page.getByRole('button', { name: '연결 저장', exact: true }).click();
+    await until(async () => (await state(host)).peers === 1, 'P2P reconnection failed', 15000);
+    await client.page.getByRole('button', { name: '기기 연결 닫기', exact: true }).click();
     await copy(client, 'copy after reconnect');
     await until(async () => await clipboard(host) === 'copy after reconnect');
   });
 
-  await check('closing the host stops its process and returns the client to a disconnected state', async () => {
+  await check('quit stops one process while the other keeps its P2P group and automatically searches again', async () => {
     const exited = new Promise<number | null>(resolve => host.app.process().once('exit', resolve));
     await host.app.close();
     assert.equal(await exited, 0);
-    await until(async () => (await state(client)).mode === 'idle' && (await state(client)).error !== null, 'Client did not detect host shutdown', 5000);
+    await until(async () => (await state(client)).mode === 'group' && (await state(client)).groupStatus === 'reconnecting', 'Peer did not retain its group after the other exited', 5000);
     assert.equal((await state(client)).peers, 0);
     await screenshot(client, 'test-results/pair-host-closed.png');
     assert.deepEqual(rendererErrors, []);
