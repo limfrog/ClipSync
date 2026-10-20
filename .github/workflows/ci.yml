@@ -10,6 +10,7 @@ permissions:
 jobs:
   checks:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
@@ -21,7 +22,17 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node node_modules/electron/install.js
-      - run: npm test
+      - name: Tests
+        shell: bash
+        run: |
+          set +e
+          npm test 2>&1 | tee "$RUNNER_TEMP/clipsync-tests.log"
+          result=${PIPESTATUS[0]}
+          set -e
+          if [[ "$result" != 0 ]]; then
+            node --input-type=module -e 'import fs from "node:fs"; import path from "node:path"; const lines = fs.readFileSync(path.join(process.env.RUNNER_TEMP, "clipsync-tests.log"), "utf8").split(/\r?\n/).slice(-85).join("\n"); console.log("::error::" + lines.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A"));'
+            exit "$result"
+          fi
       - run: npm run build
       - run: sudo apt-get update && sudo apt-get install -y xvfb gnome-keyring dbus-x11 openbox xdotool
         if: runner.os == 'Linux'
