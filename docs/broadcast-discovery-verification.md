@@ -35,3 +35,16 @@
 - 서로 다른 X 디스플레이의 패키지 앱으로 텍스트·이미지·한글 파일·500MB 프로그램·보고서의 개인정보 제외/비동기화를 검사합니다.
 
 같은 OS 호스트 내 검사이며 서로 다른 실물 Mac–Windows 연결 성공을 의미하지 않습니다. 두 실물 기기의 재검증 결과가 필요합니다. OS나 공유기가 브로드캐스트까지 차단하는 경우 이 보완만으로 연결을 보장하지 않습니다.
+
+## 완료한 자동 검사와 공개 설치본
+
+- [같은 제품 커밋 `a8a0232`의 CI](https://github.com/limfrog/ClipSync/actions/runs/39483671234): Windows·Apple Silicon Mac·Intel Mac·Linux 모두 성공. 일반 검사 38개와 Linux의 UI·보안 저장/재실행·독립 클립보드 검사를 포함합니다.
+- 로컬 패키지 앱 검사는 상위 테스트 포함 13개 통과, 총 약 37초였으며 500MB 파일 시나리오는 약 14.8초였습니다. `test-results/pair-report.json`에 버전 0.4.4와 실행 파일/ASAR 해시를 기록했습니다.
+- [v0.4.4 설치본 빌드·공개](https://github.com/limfrog/ClipSync/actions/runs/39484127353) 성공. Mac의 두 앱 코드 서명 무결성, 로컬 네트워크 사용 목적 키, PKG 확장을 확인했습니다. 배포자 신원 서명/공증 검증은 아닙니다.
+- [공개 릴리스](https://github.com/limfrog/ClipSync/releases/tag/v0.4.4)의 세 설치 파일을 HTTPS로 모두 다운로드해 형식·크기·공개 SHA256SUMS.txt와 일치함을 확인했습니다. 기록은 로컬 `release/github-download/v0.4.4/download-validation.json`에 있습니다.
+
+| 파일 | 바이트 | SHA-256 |
+| --- | ---: | --- |
+| ClipSync-0.4.4-Windows-x64-Setup.exe | 115,991,570 | `89eea63ed234b5d2701073a1cfcb4344a3ee8a0dbc466624826baf8f96373b6b` |
+| ClipSync-0.4.4-macOS-arm64.pkg | 128,275,780 | `64a28d1ceeb9c1b480919977779aae89bf720f660caf3734fa5ae055a2878529` |
+| ClipSync-0.4.4-macOS-x64.pkg | 135,234,636 | `16caed9feab035cb471b6668477479a7733f5c5e72a66ffb7c5e7e2029137ca6` |
