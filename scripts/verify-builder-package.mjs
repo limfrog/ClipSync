@@ -23,11 +23,14 @@ for (const folder of folders) {
   if (kind === 'Windows') {
     const expected = Data.IconFile.from(await readFile('build/icons/icon.ico')).icons.map(item => item.data);
     const bytes = item => Buffer.from(item.isRaw() ? item.bin : item.generate());
+    // NSIS reorders RT_ICON IDs; compare complete frame contents independent of ID order.
+    const frames = items => items.map(item => bytes(item).toString('base64')).sort();
+    const expectedFrames = frames(expected);
     for (const exe of [path.join(root, folder, 'ClipSync.exe'), path.join(root, `ClipSync-${version}-Windows-x64-Setup.exe`)]) {
       const entries = NtExecutableResource.from(NtExecutable.from(await readFile(exe))).entries;
       assert.ok(Resource.IconGroupEntry.fromEntries(entries).some(group => {
         const actual = group.getIconItemsFromEntries(entries);
-        return actual.length === expected.length && actual.every((item, index) => bytes(item).equals(bytes(expected[index])));
+        return actual.length === expected.length && frames(actual).every((frame, index) => frame === expectedFrames[index]);
       }), `Selected icon must be embedded in ${exe}`);
     }
   } else {
