@@ -8,12 +8,15 @@ module.exports = {
   npmRebuild: false,
   publish: null,
   win: {
+    icon: 'build/icons/icon.ico',
     files: ['!node_modules/**/prebuilds/{android-*,ios-*,linux-*,darwin-*}/**/*'],
     target: [{ target: 'nsis', arch: ['x64'] }],
     artifactName: 'ClipSync-${version}-Windows-${arch}-Setup.${ext}',
-    signAndEditExecutable: false,
+    signExecutable: false,
   },
   nsis: {
+    installerIcon: 'build/icons/icon.ico',
+    uninstallerIcon: 'build/icons/icon.ico',
     script: 'build/windows-installer.nsi',
     oneClick: false,
     perMachine: false,
@@ -27,6 +30,7 @@ module.exports = {
     uninstallDisplayName: 'ClipSync',
   },
   mac: {
+    icon: 'build/icons/icon.icns',
     files: ['!node_modules/**/prebuilds/{android-*,ios-*,linux-*,win32-*}/**/*'],
     target: [{ target: 'pkg', arch: ['arm64', 'x64'] }],
     category: 'public.app-category.utilities',

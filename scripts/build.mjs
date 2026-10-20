@@ -1,6 +1,6 @@
 import { build as bundle } from 'esbuild';
 import { build as renderer } from 'vite';
-import { rm } from 'node:fs/promises';
+import { cp, rm } from 'node:fs/promises';
 
 await rm('dist', { recursive: true, force: true });
 await bundle({
@@ -20,3 +20,4 @@ await renderer({
   base: './',
   build: { outDir: '../../dist/renderer', emptyOutDir: false },
 });
+await cp('assets', 'dist/assets', { recursive: true });

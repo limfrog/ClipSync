@@ -10,7 +10,7 @@ svg { display:block; flex-shrink:0; } h1,h2,h3,p { margin:0; } h1 { font-size:13
 .header { -webkit-app-region:drag; user-select:none; padding:12px 12px 10px; background:var(--bg-header); border-bottom:1px solid var(--border); flex-shrink:0; }
 .header-top { -webkit-app-region:drag; user-select:none; display:flex; justify-content:space-between; align-items:center; gap:5px; }
 .brand { display:flex; align-items:center; gap:7px; -webkit-app-region:drag; min-width:90px; }
-.logo-mark { display:grid; place-items:center; width:28px; height:28px; border-radius:7px; background:linear-gradient(135deg,#183436,#0e1b1d); border:1px solid #2ca9b859; box-shadow:0 2px 8px #0005; }
+.logo-mark { display:grid; place-items:center; width:28px; height:28px; flex-shrink:0; }.logo-mark img { display:block; width:28px; height:28px; }
 .status-badge { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--muted); margin-top:3px; white-space:nowrap; }
 .status-badge::before { content:''; width:5px; height:5px; border-radius:50%; background:var(--subtle); }.status-badge.connected::before { background:var(--success); box-shadow:0 0 6px #10b98166; }
 .toolbar { -webkit-app-region:no-drag; display:flex; align-items:center; gap:3px; }

@@ -1,8 +1,10 @@
-# ClipSync 0.4.5 · 창 상단 드래그 수정
+# ClipSync 0.4.5 · 창 상단 드래그와 새 아이콘
 
 제목 줄 위쪽 여백을 잡아도 창을 이동할 수 있도록 드래그 영역을 넓혔습니다. 설정·고정·숨김 버튼은 클릭할 수 있고, 기기 목록은 가로 스크롤을 유지합니다.
 
-[검증 기록](https://github.com/limfrog/ClipSync/blob/main/docs/window-drag-verification.md) · [새 아이콘 디자인 세 가지 제안](https://github.com/limfrog/ClipSync/blob/main/docs/icon-concepts.md)
+투명 배경에 청록색 클립보드·동기화 심볼을 담은 새 A 아이콘을 앱 로고와 Windows·Mac 설치 아이콘에 반영했습니다. Mac 메뉴바는 배경에 따라 흰색·검은색으로 표시되는 단색 템플릿을 사용합니다.
+
+[검증 기록](https://github.com/limfrog/ClipSync/blob/main/docs/window-drag-verification.md) · [아이콘 디자인](https://github.com/limfrog/ClipSync/blob/main/docs/icon-concepts.md)
 
 업데이트 전 양쪽 앱을 오른쪽 아래 **종료**로 완전히 닫으세요. ×는 창을 숨기는 동작입니다. 저장한 연결 키·비밀번호는 유지됩니다.
 

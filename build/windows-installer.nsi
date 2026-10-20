@@ -11,6 +11,12 @@ InstallDir "$LOCALAPPDATA\Programs\ClipSync"
 SetCompressor /SOLID lzma
 
 !define MUI_ABORTWARNING
+!ifndef MUI_ICON
+  !define MUI_ICON "${PROJECT_DIR}/build/icons/icon.ico"
+!endif
+!ifndef MUI_UNICON
+  !define MUI_UNICON "${PROJECT_DIR}/build/icons/icon.ico"
+!endif
 !define MUI_FINISHPAGE_RUN "$INSTDIR\ClipSync.exe"
 !define MUI_FINISHPAGE_RUN_NOTCHECKED
 !define MUI_LANGDLL_REGISTRY_ROOT HKCU

@@ -89,7 +89,7 @@ npm run test:pair
 
 ## 설치 파일과 검증
 
-[GitHub Releases](https://github.com/limfrog/ClipSync/releases)에서 자기 OS/CPU에 맞는 설치 파일과 `SHA256SUMS.txt`를 받을 수 있습니다. `v0.4.5`는 창 상단 여백에서도 드래그할 수 있도록 수정한 버전입니다. [새 아이콘 제안 세 가지](docs/icon-concepts.md)도 준비했습니다. 멀티캐스트·브로드캐스트·외부 P2P 탐색과 저장된 연결은 계속 사용합니다. 0.4.0의 저장된 키·비밀번호는 유지합니다. 설치 전 기존 앱을 **종료**하세요. 배포자 인증서 서명과 Apple 공증은 포함하지 않습니다.
+[GitHub Releases](https://github.com/limfrog/ClipSync/releases)에서 자기 OS/CPU에 맞는 설치 파일과 `SHA256SUMS.txt`를 받을 수 있습니다. `v0.4.5`는 창 상단 여백에서도 드래그할 수 있도록 수정하고 [투명 배경의 새 A 아이콘](docs/icon-concepts.md)을 적용한 버전입니다. Mac 메뉴바는 배경에 맞춰 흰색·검은색으로 표시되는 단색 템플릿을 사용합니다. 멀티캐스트·브로드캐스트·외부 P2P 탐색과 저장된 연결은 계속 사용합니다. 0.4.0의 저장된 키·비밀번호는 유지합니다. 설치 전 기존 앱을 **종료**하세요. 배포자 인증서 서명과 Apple 공증은 포함하지 않습니다.
 
 같은 공유기에 연결한 Mac과 Windows에서는 [실물 검증 절차](docs/physical-verification.md)를 따라 **연결 상태 복사** 보고서와 양방향 붙여넣기 결과를 비교할 수 있습니다.
 

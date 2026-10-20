@@ -85,14 +85,7 @@ async function connectGroup(input: GroupInput) {
 }
 
 function createTray() {
-  const bitmap = Buffer.alloc(32 * 32 * 4);
-  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
-    const outline = x >= 6 && x <= 25 && y >= 7 && y <= 28 && (x < 9 || x > 22 || y < 10 || y > 25);
-    const clip = x >= 12 && x <= 20 && y >= 4 && y <= 9;
-    const line = x >= 11 && x <= 20 && (y === 15 || y === 20);
-    if (outline || clip || line) bitmap.set(process.platform === 'darwin' ? [0, 0, 0, 255] : [184, 169, 44, 255], (y * 32 + x) * 4);
-  }
-  const icon = nativeImage.createFromBitmap(bitmap, { width: 32, height: 32 }).resize({ width: 18, height: 18 });
+  const icon = nativeImage.createFromPath(path.join(__dirname, 'assets', process.platform === 'darwin' ? 'trayTemplate.png' : 'tray.png'));
   icon.setTemplateImage(process.platform === 'darwin');
   try {
     tray = new Tray(icon);
@@ -135,7 +128,7 @@ function createWindow() {
     minWidth: 380, minHeight: 500, frame: false, movable: true, resizable: false, fullscreenable: false,
     ...(position ?? {}),
     alwaysOnTop: preferences.alwaysOnTop, skipTaskbar: Boolean(tray),
-    title: 'ClipSync', backgroundColor: '#09090b',
+    title: 'ClipSync', backgroundColor: '#09090b', icon: path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true, nodeIntegration: false, sandbox: true,
