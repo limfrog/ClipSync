@@ -64,6 +64,33 @@ test('multiple copied files commit to the receiving clipboard as one complete ba
   assert.deepEqual(mediaB.current!.paths.map(p => path.basename(p)), ['첫 번째.exe','두 번째.zip']);
 });
 
+test('text then the same file between media polls is a new copy, reuses bytes and does not echo', async t => {
+  const { a,b,mediaA,mediaB,textA,copied } = await pair(t);
+  const snapshot = await copied('빠르게 다시 복사.exe');
+  mediaA.current = snapshot;
+  await until(() => mediaB.writes === 1);
+  const read = mediaA.read.bind(mediaA);
+  let release!: () => void;
+  let entered!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const waiting = new Promise<void>(resolve => { entered = resolve; });
+  mediaA.read = async () => { entered(); await gate; return read(); };
+  try {
+    await waiting;
+    mediaA.current = null; textA.text = '중간 텍스트';
+    await until(() => b.state().received === 1);
+    // The source media reader sees no intermediate null snapshot.
+    mediaA.current = snapshot;
+  } finally { release(); }
+  await until(() => mediaB.writes === 2, 'A rapid re-copy of the same file was lost', 5000);
+  await until(() => a.state().transfers.filter(t => t.status === 'completed').length === 2);
+  assert.equal(a.state().transfers[1].bytes, 0);
+  assert.equal(b.state().transfers[1].reused, true);
+  await delay(100);
+  assert.equal(mediaA.writes, 0); assert.equal(mediaB.writes, 2);
+  assert.equal(a.state().transfers.length, 2);
+});
+
 test('concurrent automatic offers reuse the first file and the newest batch still updates the clipboard', async t => {
   const { a,b,mediaB,copied,root } = await pair(t);
   const snapshot = await copied('동시에 복사.exe');

@@ -28,6 +28,8 @@ export class MediaSync {
   private wasPaused = false;
   private epoch = 0;
   private lastSignature = '';
+  private lastRevision = -1;
+  private applying = 0;
   private latestIncoming = '';
   private outgoing = Promise.resolve();
   private incoming = Promise.resolve();
@@ -50,23 +52,26 @@ export class MediaSync {
   }
 
   private async poll() {
-    if (this.running || this.closed) return;
+    if (this.running || this.closed || this.applying) return;
     this.running = true;
     const epoch = this.epoch;
     const initialRevision = this.controller.state().clipboardRevision;
     try {
       let snapshot = await this.io.read();
-      if (this.closed || epoch !== this.epoch || initialRevision !== this.controller.state().clipboardRevision) return;
+      if (this.closed || this.applying || epoch !== this.epoch || initialRevision !== this.controller.state().clipboardRevision) return;
       const signature = snapshot?.fingerprint ?? '';
       const state = this.controller.state();
       if (!this.seeded || state.paused || this.wasPaused) {
-        this.seeded = true; this.wasPaused = state.paused; this.lastSignature = signature; return;
+        this.seeded = true; this.wasPaused = state.paused; this.lastSignature = signature; this.lastRevision = state.clipboardRevision; return;
       }
-      if (signature === this.lastSignature) return;
-      this.lastSignature = signature; this.error = '';
+      // A text -> same-file copy can occur entirely between two media polls.
+      // The text controller's revision still proves that this is a fresh copy.
+      if (signature === this.lastSignature && state.clipboardRevision === this.lastRevision) return;
+      this.lastSignature = signature; this.lastRevision = state.clipboardRevision; this.error = '';
       if (!snapshot) return;
       this.controller.mediaChanged();
       const capturedRevision = this.controller.state().clipboardRevision;
+      this.lastRevision = capturedRevision;
       if (this.io.materialize) snapshot = await this.io.materialize(snapshot);
       if (this.closed || capturedRevision !== this.controller.state().clipboardRevision) return;
       this.record(snapshot, 'local');
@@ -188,13 +193,19 @@ export class MediaSync {
   }
 
   private async apply(snapshot: MediaSnapshot, expectedRevision?: number) {
-    await this.controller.applyMedia(async () => {
-      this.epoch++;
-      try {
-        await this.io.write(snapshot);
-        this.lastSignature = (await this.io.read())?.fingerprint ?? '';
-      } finally { this.epoch++; }
-    }, expectedRevision);
+    this.applying++;
+    try {
+      const applied = await this.controller.applyMedia(async () => {
+        this.epoch++;
+        try {
+          await this.io.write(snapshot);
+          this.lastSignature = (await this.io.read())?.fingerprint ?? '';
+        } finally { this.epoch++; }
+      }, expectedRevision);
+      // Include the revision committed by applyMedia, so a remote/history write
+      // is not mistaken for another local copy and sent back to the group.
+      if (applied) this.lastRevision = this.controller.state().clipboardRevision;
+    } finally { this.applying--; }
   }
 
   async copy(id: string) {
