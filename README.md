@@ -15,6 +15,8 @@
 
 환경설정의 **종료 후에도 클립보드 기록 유지**를 켜면 다음 실행에 텍스트·이미지·파일 기록과 고정을 복원합니다. 기본값은 꺼짐이며, 저장한 기록을 복원해도 자동으로 다른 기기에 전송하지 않습니다.
 
+환경설정의 **새 버전 자동 확인**은 기본으로 켜져 있습니다. 설치 앱 실행 후와 6시간마다 GitHub를 확인하고 새 버전이 있으면 알림과 다운로드 버튼을 표시합니다. **업데이트 확인**으로 직접 확인할 수도 있습니다. 다운로드는 이 PC에 맞는 공식 설치 파일 주소를 브라우저에서 열며, 앱 종료 후 직접 설치하세요. 클립보드·연결 정보는 버전 확인에 보내지 않습니다. [업데이트 검증](docs/update-verification.md).
+
 환경설정의 **부팅 시 시작**을 체크하면 로그인 후 창을 띄우지 않고 트레이·메뉴바에서 시작합니다. 해제하면 OS 자동 시작 등록을 제거합니다. Mac에서 승인이 필요하면 설정 화면의 안내를 따르세요. 창 고정은 상단 핀 버튼으로 사용할 수 있습니다.
 
 기기 연결에서 **일시정지**하면 새 내용의 동기화와 자동 파일 수신을 멈춥니다. 재개할 때 중간에 복사한 개인 내용을 다시 보내지 않습니다. 진행 중인 자동 동기화도 취소합니다. 다른 PC끼리의 직접 연결에는 영향을 주지 않습니다.
@@ -93,11 +95,11 @@ npm run test:pair
 
 ## 설치 파일과 검증
 
-[GitHub Releases](https://github.com/limfrog/ClipSync/releases)에서 자기 OS/CPU에 맞는 설치 파일과 `SHA256SUMS.txt`를 받을 수 있습니다. `v0.4.8`(빌드 8)은 [개발자 정보·버전/빌드 표시·오프라인 개인정보처리방침과 이용약관](docs/developer-legal-verification.md)을 포함합니다. [0.4.7의 창 크기 조절·선택 강조·Windows 아이콘·기록 유지·Mac 창 열기 수정](docs/window-history-verification.md)도 유지합니다. [0.4.6의 중복 수신 방지·부팅 시 시작](docs/receipt-startup-verification.md)도 유지합니다. 상단 드래그와 [투명 배경 A 아이콘](docs/icon-concepts.md)도 유지합니다. Mac 메뉴바는 배경에 맞춰 흰색·검은색으로 표시되는 단색 템플릿을 사용합니다. 멀티캐스트·브로드캐스트·외부 P2P 탐색과 저장된 연결은 계속 사용합니다. 0.4.0의 저장된 키·비밀번호는 유지합니다. 설치 전 기존 앱을 **종료**하세요. 배포자 인증서 서명과 Apple 공증은 포함하지 않습니다.
+[GitHub Releases](https://github.com/limfrog/ClipSync/releases)에서 자기 OS/CPU에 맞는 설치 파일과 `SHA256SUMS.txt`를 받을 수 있습니다. `v0.4.9`(빌드 8)은 [개발자 정보·버전/빌드 표시·오프라인 개인정보처리방침과 이용약관](docs/developer-legal-verification.md)을 포함합니다. [0.4.7의 창 크기 조절·선택 강조·Windows 아이콘·기록 유지·Mac 창 열기 수정](docs/window-history-verification.md)도 유지합니다. [0.4.6의 중복 수신 방지·부팅 시 시작](docs/receipt-startup-verification.md)도 유지합니다. 상단 드래그와 [투명 배경 A 아이콘](docs/icon-concepts.md)도 유지합니다. Mac 메뉴바는 배경에 맞춰 흰색·검은색으로 표시되는 단색 템플릿을 사용합니다. 멀티캐스트·브로드캐스트·외부 P2P 탐색과 저장된 연결은 계속 사용합니다. 0.4.0의 저장된 키·비밀번호는 유지합니다. 설치 전 기존 앱을 **종료**하세요. 배포자 인증서 서명과 Apple 공증은 포함하지 않습니다.
 
 같은 공유기에 연결한 Mac과 Windows에서는 [실물 검증 절차](docs/physical-verification.md)를 따라 **연결 상태 복사** 보고서와 양방향 붙여넣기 결과를 비교할 수 있습니다.
 
-검증 범위와 결과는 [0.4.8 개발자·정책 검증](docs/developer-legal-verification.md), [0.4.7 창·기록 검증](docs/window-history-verification.md), [0.4.6 중복 수신·자동 시작 검증](docs/receipt-startup-verification.md), [0.4.5 창 이동 검증 기록](docs/window-drag-verification.md), [0.4.4 브로드캐스트 검증 기록](docs/broadcast-discovery-verification.md), [0.4.3 발견 속도 검증 기록](docs/discovery-verification.md) 및 [0.4.0 P2P 검증 기록](docs/p2p-verification.md), 빌드 설정은 [설치 프로그램 안내](docs/installers.md)를 참고하세요. 연결되지 않으면 모든 PC의 키·비밀번호·버전이 일치하는지, UDP와 공개 DHT 접근이 허용되는지 확인하세요. 일부 네트워크는 직접 P2P 연결을 지원하지 않습니다.
+검증 범위와 결과는 [0.4.9 개발자·정책 검증](docs/developer-legal-verification.md), [0.4.7 창·기록 검증](docs/window-history-verification.md), [0.4.6 중복 수신·자동 시작 검증](docs/receipt-startup-verification.md), [0.4.5 창 이동 검증 기록](docs/window-drag-verification.md), [0.4.4 브로드캐스트 검증 기록](docs/broadcast-discovery-verification.md), [0.4.3 발견 속도 검증 기록](docs/discovery-verification.md) 및 [0.4.0 P2P 검증 기록](docs/p2p-verification.md), 빌드 설정은 [설치 프로그램 안내](docs/installers.md)를 참고하세요. 연결되지 않으면 모든 PC의 키·비밀번호·버전이 일치하는지, UDP와 공개 DHT 접근이 허용되는지 확인하세요. 일부 네트워크는 직접 P2P 연결을 지원하지 않습니다.
 
 ## 데이터 처리와 참고 원본
 

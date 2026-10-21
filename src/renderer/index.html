@@ -29,6 +29,7 @@
     <div class="manager-hint">복사하면 기록됩니다. 연결된 기기에서도 그대로 붙여넣으세요.</div>
   </div>
   <div id="error" class="error-message" role="alert" hidden></div>
+  <aside id="update-banner" class="update-banner" aria-label="업데이트 알림" hidden><span id="update-banner-text"></span><button id="banner-download-update" class="button primary" type="button">다운로드</button></aside>
   <main class="history-container" aria-label="클립보드 기록">
     <section id="transfer-list" aria-label="진행 중인 파일 전송"></section>
     <section id="history-list" aria-label="클립보드 히스토리"></section>
@@ -64,9 +65,17 @@
       <p id="startup-note" class="small-note">컴퓨터에 로그인하면 트레이·메뉴바에서 자동으로 시작합니다.</p>
       <label class="checkbox-row"><input id="retain-history" type="checkbox" aria-describedby="history-note" /> 종료 후에도 클립보드 기록 유지</label>
       <p id="history-note" class="small-note">최대 100개의 기록을 이 PC에 보관합니다. 텍스트·파일 경로는 OS 보안 저장소로 암호화하며, 이미지는 앱 전용 폴더에 저장합니다. 파일은 원본이 있어야 다시 복사할 수 있습니다. 해제하면 저장된 기록을 지우고, 현재 기록은 앱 종료 시 사라집니다.</p>
+      <label class="checkbox-row"><input id="auto-check-updates" type="checkbox" aria-describedby="auto-update-note" /> 새 버전 자동 확인</label>
+      <p id="auto-update-note" class="small-note">실행 후와 6시간마다 GitHub에 접속해 새 버전을 확인하고 알려드립니다. 클립보드 내용과 연결 정보는 전송하지 않습니다.</p>
       <section class="section-card"><h3>창과 기록</h3><p>창 가장자리와 모서리를 드래그해 크기를 조절하세요. 크기와 위치는 다음 실행에도 유지됩니다. ×·Esc는 창을 숨기고 동기화를 계속합니다. 종료 버튼은 앱을 완전히 닫습니다.</p></section>
       <button class="button primary full" type="submit">설정 저장</button>
     </form>
+    <section class="update-settings" aria-labelledby="update-title">
+      <h3 id="update-title">업데이트</h3>
+      <p id="update-status" class="small-note" role="status">새 버전을 확인할 수 있습니다.</p>
+      <div class="action-row"><button id="check-updates" class="button secondary" type="button">업데이트 확인</button><button id="download-update" class="button primary" type="button" hidden>새 버전 다운로드</button></div>
+      <p class="small-note">다운로드는 브라우저에서 진행됩니다. 완료 후 ClipSync를 종료하고 설치 파일을 실행하세요. 연결 정보와 설정은 유지됩니다.</p>
+    </section>
     <section class="developer-info" aria-labelledby="developer-title">
       <h3 id="developer-title">개발자 및 문의</h3>
       <p id="developer-name">Horizon Entertainment</p>

@@ -1,6 +1,7 @@
 import type { Peer, TransferState } from './transfers';
 import type { HistoryItem, Preferences } from './history';
 import type { ConnectionInfo, GroupInput, GroupStatus } from './group';
+import type { UpdateState } from './updates';
 import type { AppInfo } from './app-info';
 
 export interface SyncState {
@@ -24,6 +25,10 @@ export interface Result { ok: boolean; error?: string }
 
 export interface ClipSyncAPI {
   appInfo(): Promise<AppInfo>;
+  updates(): Promise<UpdateState>;
+  checkUpdates(): Promise<UpdateState>;
+  downloadUpdate(): Promise<Result>;
+  onUpdates(listener: (state: UpdateState) => void): () => void;
   contactDeveloper(): Promise<Result>;
   connection(): Promise<ConnectionInfo>;
   createGroupKey(): Promise<string>;

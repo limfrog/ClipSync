@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, nativeImage, safeStorage, screen, shell, Tray } from 'electron';
+import { app, BrowserWindow, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, nativeImage, net, Notification, safeStorage, screen, shell, Tray } from 'electron';
 import path from 'node:path';
 import { createWriteStream, openAsBlob } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
@@ -16,6 +16,8 @@ import type { GroupCredentials, GroupInput } from '../shared/group';
 import { LoginStartup } from './login-startup';
 import { HistoryStore } from './history-store';
 import { MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, restoreWindowBounds, type WindowBounds } from './window-bounds';
+import { UpdateChecker } from './updates';
+import type { UpdateState } from '../shared/updates';
 import { CONTACT_EMAIL, DEVELOPER, type AppInfo } from '../shared/app-info';
 
 let window: BrowserWindow | null = null;
@@ -41,6 +43,34 @@ let historyScheduledRevision = -1;
 let historyConfiguring = false;
 const startup = new LoginStartup(app);
 let startedAtLogin = false;
+let updates: UpdateChecker | undefined;
+let updateTimer: ReturnType<typeof setTimeout> | undefined;
+let updateInterval: ReturnType<typeof setInterval> | undefined;
+let lastNotifiedVersion = '';
+let updateNotification: Notification | undefined;
+function scheduleUpdates() {
+  clearTimeout(updateTimer); clearInterval(updateInterval);
+  // Development and native integration tests never poll GitHub in the background.
+  if (!app.isPackaged || !preferences.checkUpdates || quitting) return;
+  updateTimer = setTimeout(() => { void updates?.check(); }, 15_000);
+  updateInterval = setInterval(() => { void updates?.check(); }, 6 * 60 * 60 * 1000);
+}
+function updated(state: UpdateState) {
+  if (quitting) return;
+  if (window && !window.isDestroyed()) window.webContents.send('clipsync:updates', state);
+  const release = state.release;
+  if (!app.isPackaged || !preferences.checkUpdates || !release || lastNotifiedVersion === release.version || !Notification.isSupported()) return;
+  try {
+    updateNotification = new Notification({ title: `ClipSync ${release.version} 업데이트`, body: '새 버전이 있습니다. ClipSync에서 다운로드할 수 있습니다.', silent: true });
+    updateNotification.on('click', showWindow);
+    updateNotification.on('show', () => {
+      lastNotifiedVersion = release.version;
+      void writeFile(path.join(app.getPath('userData'), 'update-notification.json'), JSON.stringify({ version: release.version }), { mode: 0o600 }).catch(() => {});
+    });
+    updateNotification.on('failed', () => {});
+    updateNotification.show();
+  } catch { /* The persistent in-app banner remains available when OS notifications are denied. */ }
+}
 const imageCachePath = async () => imageCache ??= await mkdtemp(path.join(app.getPath('temp'), 'clipsync-images-'));
 
 function validatePreferences(value: unknown): Preferences {
@@ -49,10 +79,11 @@ function validatePreferences(value: unknown): Preferences {
   if (!['system', 'dark', 'light'].includes(p.theme) || typeof p.alwaysOnTop !== 'boolean' ||
       (p.startOnLogin !== undefined && typeof p.startOnLogin !== 'boolean') ||
       (p.retainHistory !== undefined && typeof p.retainHistory !== 'boolean') ||
+      (p.checkUpdates !== undefined && typeof p.checkUpdates !== 'boolean') ||
       typeof p.shortcut !== 'string' || p.shortcut.length > 80 || !/^(?=.*(?:Control|Ctrl|Command|Cmd|Alt|Option)).+\+[A-Z0-9]$/i.test(p.shortcut)) {
     throw new Error('테마와 단축키 설정을 확인해 주세요.');
   }
-  return { theme: p.theme, alwaysOnTop: p.alwaysOnTop, startOnLogin: p.startOnLogin ?? false, retainHistory: p.retainHistory ?? false, shortcut: p.shortcut };
+  return { theme: p.theme, alwaysOnTop: p.alwaysOnTop, startOnLogin: p.startOnLogin ?? false, retainHistory: p.retainHistory ?? false, checkUpdates: p.checkUpdates ?? true, shortcut: p.shortcut };
 }
 
 const preferencesPath = () => path.join(app.getPath('userData'), 'preferences.json');
@@ -150,7 +181,9 @@ async function configure(value: unknown) {
     if (newShortcut) globalShortcut.unregister(next.shortcut); throw error;
   }
   if (next.shortcut !== preferences.shortcut) globalShortcut.unregister(preferences.shortcut);
+  const changedUpdates = next.checkUpdates !== preferences.checkUpdates;
   preferences = next;
+  if (changedUpdates) scheduleUpdates();
   historyConfiguring = false;
   if (changeRetention) historyScheduledRevision = -1;
   scheduleHistory();
@@ -184,6 +217,7 @@ function saveBounds() {
 
 // Tests isolate app data; normal desktops use Electron's standard per-user path.
 if (process.env.CLIPSYNC_DATA_DIR) app.setPath('userData', process.env.CLIPSYNC_DATA_DIR);
+if (process.platform === 'win32') app.setAppUserModelId('dev.limfrog.clipsync');
 const primaryInstance = app.requestSingleInstanceLock();
 if (!primaryInstance) app.quit();
 app.on('second-instance', (_event, commandLine) => {
@@ -231,9 +265,16 @@ if (primaryInstance) void app.whenReady().then(async () => {
   const metadata = JSON.parse(await readFile(path.join(__dirname, '..', 'package.json'), 'utf8'));
   if (!Number.isSafeInteger(metadata.buildNumber) || metadata.buildNumber < 1) throw new Error('앱 빌드 정보를 확인할 수 없습니다.');
   const appInfo: AppInfo = { developer: DEVELOPER, email: CONTACT_EMAIL, version: metadata.version, buildNumber: String(metadata.buildNumber) };
+  if (process.platform === 'win32' && app.isPackaged) {
+    // The custom NSIS installer creates this shortcut; associate toast notifications
+    // with the same installed app instead of an anonymous Electron process.
+    try { shell.writeShortcutLink(path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'ClipSync', 'ClipSync.lnk'), 'update', { appUserModelId: 'dev.limfrog.clipsync' }); } catch { /* In-app update notice also works without a Start menu shortcut. */ }
+  }
   startedAtLogin = startup.startedAtLogin();
   try { preferences = validatePreferences(JSON.parse(await readFile(preferencesPath(), 'utf8'))); }
   catch { preferences = { ...DEFAULT_PREFERENCES }; }
+  updates = new UpdateChecker({ version: appInfo.version, platform: process.platform, arch: process.arch, fetch: net.fetch.bind(net), changed: updated });
+  try { const saved = JSON.parse(await readFile(path.join(app.getPath('userData'), 'update-notification.json'), 'utf8')); if (typeof saved.version === 'string') lastNotifiedVersion = saved.version; } catch { /* No prior notification. */ }
   let savedBounds: unknown;
   try { savedBounds = JSON.parse(await readFile(path.join(app.getPath('userData'), 'window-position.json'), 'utf8')); } catch { /* Default bounds. */ }
   bounds = restoreWindowBounds(savedBounds, screen.getAllDisplays().map(display => display.workArea), screen.getPrimaryDisplay().workArea);
@@ -267,11 +308,18 @@ if (primaryInstance) void app.whenReady().then(async () => {
   ipcMain.handle('clipsync:get-state', () => controller.state());
   ipcMain.handle('clipsync:preferences', () => currentPreferences());
   const trusted = (event: Electron.IpcMainInvokeEvent) => window && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame;
+  ipcMain.handle('clipsync:updates', event => { if (!trusted(event)) throw new Error('허용되지 않은 창입니다.'); return updates!.state(); });
+  ipcMain.handle('clipsync:check-updates', event => { if (!trusted(event)) throw new Error('허용되지 않은 창입니다.'); return updates!.check(); });
   ipcMain.handle('clipsync:app-info', event => { if (!trusted(event)) throw new Error('허용되지 않은 창입니다.'); return appInfo; });
   ipcMain.handle('clipsync:connection', event => { if (!trusted(event)) throw new Error('허용되지 않은 창입니다.'); return connectionInfo(); });
   ipcMain.handle('clipsync:create-group-key', event => { if (!trusted(event)) throw new Error('허용되지 않은 창입니다.'); return createGroupKey(); });
   const actions: Record<string, (...args: never[]) => unknown> = {
     // Fixed destination only: renderer input cannot open arbitrary protocols or URLs.
+    'download-update': async () => {
+      const state = updates!.state();
+      if (state.status !== 'available' || !state.release) throw new Error('먼저 업데이트를 확인해 주세요.');
+      await shell.openExternal(state.release.downloadUrl);
+    },
     'contact-developer': () => shell.openExternal(`mailto:${CONTACT_EMAIL}`),
     configure: (value: unknown) => {
       const work = settingsQueue.then(() => configure(value));
@@ -347,6 +395,7 @@ if (primaryInstance) void app.whenReady().then(async () => {
   createTray();
   globalShortcut.register(preferences.shortcut, toggleWindow);
   createWindow();
+  scheduleUpdates();
   if (startedAtLogin && tray && process.platform === 'darwin') app.dock?.hide();
   try {
     const saved = await connectionStore.load();
@@ -363,6 +412,7 @@ app.on('before-quit', event => {
   if (quitting || !controller) return;
   event.preventDefault();
   quitting = true;
+  clearTimeout(updateTimer); clearInterval(updateInterval); updates?.dispose(); updateNotification?.close();
   clearTimeout(positionTimer);
   clearTimeout(historyTimer);
   globalShortcut.unregisterAll();

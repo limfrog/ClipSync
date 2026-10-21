@@ -1,6 +1,7 @@
 import './style.css';
 import type { ClipSyncAPI, Result, SyncState } from '../shared/api';
 import { DEFAULT_PREFERENCES, type HistoryItem, type Preferences } from '../shared/history';
+import type { UpdateState } from '../shared/updates';
 import type { ConnectionInfo } from '../shared/group';
 import type { TransferState } from '../shared/transfers';
 import { LEGAL_EFFECTIVE_DATE, LEGAL_VERSION, type AppInfo } from '../shared/app-info';
@@ -19,6 +20,7 @@ const legal = element<HTMLDialogElement>('legal-dialog');
 let current: SyncState;
 let preferences: Preferences = { ...DEFAULT_PREFERENCES };
 let busy = false;
+let updateState: UpdateState = { status: 'idle', currentVersion: '' };
 let filter = 'all';
 let historySignature = '';
 let transferSignature = '';
@@ -41,6 +43,7 @@ function showError(message: string | null) {
 }
 function enabled() {
   document.querySelectorAll<HTMLButtonElement>('button').forEach(button => { button.disabled = busy; });
+  updateButtons();
 }
 async function act(action: () => Promise<Result>, success?: string) {
   if (busy) return;
@@ -64,6 +67,28 @@ function updateAppInfo(value: AppInfo) {
   element('contact-developer').textContent = value.email;
   element('app-version').textContent = `버전 ${value.version} · 빌드 ${value.buildNumber}`;
 }
+function updateButtons() {
+  element<HTMLButtonElement>('check-updates').disabled = busy || updateState.status === 'checking' || updateState.status === 'unsupported';
+  for (const id of ['download-update', 'banner-download-update']) element<HTMLButtonElement>(id).disabled = busy || updateState.status !== 'available';
+}
+function renderUpdates(state: UpdateState) {
+  updateState = state;
+  const release = state.release;
+  const available = state.status === 'available' && Boolean(release);
+  element('download-update').hidden = !available;
+  element('update-banner').hidden = !available;
+  const label = release ? `ClipSync ${release.version}${release.preview ? ' (미리보기)' : ''}` : '';
+  element('update-banner-text').textContent = available ? `${label} 업데이트가 있습니다.` : '';
+  const checked = state.checkedAt ? ` · ${new Date(state.checkedAt).toLocaleString('ko-KR')} 확인` : '';
+  element('update-status').textContent = state.status === 'checking' ? 'GitHub에서 새 버전을 확인하고 있습니다…' : available ? `${label}을 다운로드할 수 있습니다.${checked}` : state.status === 'current' ? `현재 버전 ${state.currentVersion}이 최신입니다.${checked}` : state.status === 'error' ? state.error ?? '업데이트를 확인하지 못했습니다.' : state.status === 'unsupported' ? '업데이트 다운로드는 Windows x64·Mac 설치 앱에서 지원합니다.' : '새 버전을 확인할 수 있습니다.';
+  updateButtons();
+}
+element('check-updates').addEventListener('click', async () => {
+  renderUpdates({ status: 'checking', currentVersion: updateState.currentVersion });
+  try { renderUpdates(await window.clipSync.checkUpdates()); }
+  catch { renderUpdates({ status: 'error', currentVersion: updateState.currentVersion, error: '업데이트를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.' }); }
+});
+for (const id of ['download-update', 'banner-download-update']) element(id).addEventListener('click', () => { void act(() => window.clipSync.downloadUpdate(), '브라우저에서 다운로드를 시작합니다. 완료 후 ClipSync를 종료하고 설치해 주세요.'); });
 function render(state: SyncState) {
   current = state;
   const connected = state.mode !== 'idle';
@@ -175,6 +200,8 @@ for (const id of ['open-connection', 'open-settings']) element(id).addEventListe
     element<HTMLSelectElement>('theme').value = preferences.theme;
     element<HTMLInputElement>('shortcut-setting').value = preferences.shortcut;
     element<HTMLInputElement>('retain-history').checked = preferences.retainHistory;
+    element<HTMLInputElement>('auto-check-updates').checked = preferences.checkUpdates;
+    void window.clipSync.updates().then(renderUpdates).catch(() => {});
     const startup = element<HTMLInputElement>('start-on-login');
     startup.checked = preferences.startOnLogin;
     startup.disabled = preferences.startupStatus === 'unsupported' || preferences.startupStatus === 'unavailable';
@@ -224,7 +251,7 @@ element('disconnect').addEventListener('click', () => { void act(async () => { c
 element('settings-form').addEventListener('submit', event => {
   event.preventDefault();
   void act(async () => {
-    const result = await window.clipSync.configure({ ...preferences, theme: element<HTMLSelectElement>('theme').value as Preferences['theme'], shortcut: element<HTMLInputElement>('shortcut-setting').value.trim(), startOnLogin: element<HTMLInputElement>('start-on-login').checked, retainHistory: element<HTMLInputElement>('retain-history').checked });
+    const result = await window.clipSync.configure({ ...preferences, theme: element<HTMLSelectElement>('theme').value as Preferences['theme'], shortcut: element<HTMLInputElement>('shortcut-setting').value.trim(), startOnLogin: element<HTMLInputElement>('start-on-login').checked, retainHistory: element<HTMLInputElement>('retain-history').checked, checkUpdates: element<HTMLInputElement>('auto-check-updates').checked });
     if (result.ok) {
       updatePreferences(await window.clipSync.preferences());
       settings.close();
@@ -257,6 +284,8 @@ function dispatchAction(event: MouseEvent) {
   };
   if (actions[button.dataset.action!]) void act(actions[button.dataset.action!], button.dataset.action === 'copy' || button.dataset.action === 'image' ? '클립보드에 복사했어요.' : undefined);
 }
+window.clipSync.onUpdates(renderUpdates);
 window.clipSync.subscribe(render);
 window.clipSync.onPreferences(updatePreferences);
+void window.clipSync.updates().then(renderUpdates).catch(() => {});
 void Promise.all([window.clipSync.state().then(render), window.clipSync.preferences().then(updatePreferences), window.clipSync.connection().then(updateConnection), window.clipSync.appInfo().then(updateAppInfo)]).catch(() => showError('앱을 다시 실행해 주세요.'));

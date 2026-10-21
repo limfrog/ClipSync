@@ -74,7 +74,7 @@ test('resizable manager retains encrypted text, images, file references and pins
     const document = page!.getByRole('dialog', { name: label, exact: true });
     await document.waitFor();
     assert.equal(await page!.locator('#legal-body').textContent(), await readFile(path.join('legal', filename), 'utf8'));
-    assert.equal(await page!.locator('#legal-date').textContent(), '시행일 2026-10-21 · 문서 1.0');
+    assert.equal(await page!.locator('#legal-date').textContent(), '시행일 2026-10-21 · 문서 1.1');
     await page!.locator('#legal-body').evaluate(element => { element.scrollTop = element.scrollHeight; });
     await page!.keyboard.press('Escape');
     await until(async () => !await document.isVisible());
@@ -82,6 +82,42 @@ test('resizable manager retains encrypted text, images, file references and pins
     assert.equal(await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible()), true);
   }
   assert.deepEqual(requests, [], 'Reading bundled legal documents must not request an external website');
+  assert.equal(await page!.getByRole('checkbox', { name: '새 버전 자동 확인', exact: true }).isChecked(), true);
+  const platform = await app!.evaluate(() => process.platform);
+  if (platform === 'win32' || platform === 'darwin') {
+    const target = await app!.evaluate(({ session, shell }) => {
+      const suffix = process.platform === 'win32' ? 'Windows-x64-Setup.exe' : `macOS-${process.arch}.pkg`;
+      const url = `https://github.com/limfrog/ClipSync/releases/download/v99.1.0/ClipSync-99.1.0-${suffix}`;
+      const state = globalThis as typeof globalThis & { updateDownloads?: string[]; updateRequests?: number; originalUpdateOpen?: typeof shell.openExternal };
+      state.updateDownloads = []; state.updateRequests = 0; state.originalUpdateOpen = shell.openExternal;
+      shell.openExternal = async destination => { state.updateDownloads!.push(destination); };
+      session.defaultSession.protocol.handle('https', request => {
+        if (request.url !== 'https://api.github.com/repos/limfrog/ClipSync/releases?per_page=20') throw new Error('Unexpected updater request');
+        state.updateRequests!++;
+        return Response.json([{ tag_name: 'v99.1.0', draft: false, prerelease: true, assets: [{ name: `ClipSync-99.1.0-${suffix}`, state: 'uploaded', size: 123456789, browser_download_url: url }] }]);
+      });
+      return url;
+    });
+    await page!.getByRole('button', { name: '업데이트 확인', exact: true }).click();
+    await page!.getByText('ClipSync 99.1.0 (미리보기)을 다운로드할 수 있습니다.', { exact: false }).waitFor();
+    await page!.getByRole('button', { name: '새 버전 다운로드', exact: true }).click();
+    await until(async () => (await app!.evaluate(() => (globalThis as typeof globalThis & { updateDownloads: string[] }).updateDownloads)).length === 1);
+    assert.deepEqual(await app!.evaluate(() => (globalThis as typeof globalThis & { updateDownloads: string[] }).updateDownloads), [target]);
+    await page!.getByRole('button', { name: '업데이트 확인', exact: true }).click();
+    assert.equal(await app!.evaluate(() => (globalThis as typeof globalThis & { updateRequests: number }).updateRequests), 1, 'Repeated clicks must not exhaust GitHub rate limits');
+    await page!.screenshot({ path: 'test-results/settings-updates.png' });
+    await app!.evaluate(({ session, shell }) => {
+      session.defaultSession.protocol.unhandle('https');
+      shell.openExternal = (globalThis as typeof globalThis & { originalUpdateOpen: typeof shell.openExternal }).originalUpdateOpen;
+    });
+  } else {
+    assert.equal((await page!.evaluate(() => window.clipSync.checkUpdates())).status, 'unsupported');
+  }
+  await page!.getByRole('checkbox', { name: '새 버전 자동 확인', exact: true }).uncheck();
+  await page!.getByRole('button', { name: '설정 저장', exact: true }).click();
+  assert.equal((await page!.evaluate(() => window.clipSync.preferences())).checkUpdates, false);
+  await page!.getByRole('button', { name: '환경설정', exact: true }).click();
+  assert.equal(await page!.getByRole('checkbox', { name: '새 버전 자동 확인', exact: true }).isChecked(), false);
   await page!.screenshot({ path: 'test-results/settings-developer-build.png' });
   await page!.getByRole('button', { name: '환경설정 닫기', exact: true }).click();
   await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(720, 820));
@@ -143,6 +179,7 @@ test('resizable manager retains encrypted text, images, file references and pins
   assert.deepEqual(await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getNormalBounds()), bounds);
   const restored = (await page!.evaluate(() => window.clipSync.state())).history;
   assert.deepEqual(restored.map(item => [item.id, item.pinned, item.copiedAt]), before.map(item => [item.id, item.pinned, item.copiedAt]));
+  assert.equal((await page!.evaluate(() => window.clipSync.preferences())).checkUpdates, false, 'Automatic update preference must persist after restart');
   assert.equal((await page!.evaluate(() => window.clipSync.state())).sent, 0);
   const textId = restored.find(item => item.preview.includes('재실행 후에도'))!.id;
   assert.equal((await page!.evaluate(id => window.clipSync.history('copy', id), textId)).ok, true);

@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { ClipSyncAPI, SyncState } from '../shared/api';
+import type { UpdateState } from '../shared/updates';
 import type { Preferences } from '../shared/history';
 
 let history: SyncState['history'] = [];
@@ -10,6 +11,14 @@ function decodeState(state: Omit<SyncState, 'history'> & { history?: SyncState['
 }
 
 const api: ClipSyncAPI = {
+  updates: () => ipcRenderer.invoke('clipsync:updates'),
+  checkUpdates: () => ipcRenderer.invoke('clipsync:check-updates'),
+  downloadUpdate: () => ipcRenderer.invoke('clipsync:download-update'),
+  onUpdates(listener) {
+    const handler = (_event: Electron.IpcRendererEvent, state: UpdateState) => listener(state);
+    ipcRenderer.on('clipsync:updates', handler);
+    return () => ipcRenderer.removeListener('clipsync:updates', handler);
+  },
   appInfo: () => ipcRenderer.invoke('clipsync:app-info'),
   contactDeveloper: () => ipcRenderer.invoke('clipsync:contact-developer'),
   connection: () => ipcRenderer.invoke('clipsync:connection'),

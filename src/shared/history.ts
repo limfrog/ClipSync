@@ -18,11 +18,12 @@ export interface Preferences {
   alwaysOnTop: boolean;
   startOnLogin: boolean;
   retainHistory: boolean;
+  checkUpdates: boolean;
   startupStatus?: 'unsupported' | 'unavailable' | 'disabled' | 'enabled' | 'requires-approval' | 'blocked';
   shortcut: string;
   shortcutAvailable?: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  theme: 'system', alwaysOnTop: false, startOnLogin: false, retainHistory: false, shortcut: 'CommandOrControl+Shift+V',
+  theme: 'system', alwaysOnTop: false, startOnLogin: false, retainHistory: false, checkUpdates: true, shortcut: 'CommandOrControl+Shift+V',
 };

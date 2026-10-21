@@ -54,3 +54,8 @@ dialog { width:calc(100% - 28px); max-width:370px; max-height:calc(100vh - 32px)
 #legal-dialog { width:calc(100% - 28px); max-width:620px; height:calc(100vh - 32px); }
 #legal-date { flex-shrink:0; margin:0 0 12px; }
 .legal-body { min-height:0; overflow-y:auto; padding:4px 6px 4px 2px; white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.85; font-size:13px; color:var(--text); user-select:text; }
+
+.update-settings { border-top:1px solid var(--border); margin-top:18px; padding-top:16px; }
+.update-settings .action-row { flex-wrap:wrap; }.update-settings .action-row button { flex:1 1 auto; }
+.update-banner { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 16px; border-bottom:1px solid var(--border-strong); background:var(--bg-hover); color:var(--text); font-size:12px; }
+.update-banner span { min-width:0; overflow-wrap:anywhere; }.update-banner button { flex-shrink:0; }
