@@ -41,3 +41,16 @@ dialog { width:calc(100% - 28px); max-width:370px; max-height:calc(100vh - 32px)
 .manager-hint { font-size:12px; line-height:1.6; color:var(--subtle); padding:10px 2px 2px; }.media-preview { display:block; max-width:100%; max-height:150px; object-fit:contain; border-radius:6px; margin-top:8px; }.media-size { color:var(--subtle); font-size:12px; margin-top:5px; }
 
 .key-input-row { display:flex; gap:6px; }.key-input-row input { flex:1; width:0; font-family:ui-monospace,monospace; font-size:13px; }.key-input-row button { flex-shrink:0; padding:7px; font-size:12px; }#group-key-display { font-family:ui-monospace,monospace; font-size:16px; letter-spacing:.5px; overflow-wrap:anywhere; }
+
+#settings-dialog[open],#legal-dialog[open] { display:flex; flex-direction:column; overflow:hidden; }
+#settings-dialog .modal-head,#settings-dialog .error-message,#legal-dialog .modal-head { flex-shrink:0; }
+.settings-content { min-height:0; overflow-y:auto; padding:0 3px 3px; }
+.developer-info { margin-top:18px; padding-top:16px; border-top:1px solid var(--border); }
+.developer-info>p { overflow-wrap:anywhere; }
+.contact-link { display:block; max-width:100%; margin-top:6px; padding:0; border:0; background:none; color:var(--accent); text-align:left; font-size:13px; overflow-wrap:anywhere; user-select:text; }
+.contact-link:hover { color:var(--accent-hover); text-decoration:underline; }
+.legal-links { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }.legal-links button { flex:1 1 auto; }
+.settings-build-bar { flex-shrink:0; flex-wrap:wrap; gap:6px; font-variant-numeric:tabular-nums; }.settings-build-bar #app-version { color:var(--text); }
+#legal-dialog { width:calc(100% - 28px); max-width:620px; height:calc(100vh - 32px); }
+#legal-date { flex-shrink:0; margin:0 0 12px; }
+.legal-body { min-height:0; overflow-y:auto; padding:4px 6px 4px 2px; white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.85; font-size:13px; color:var(--text); user-select:text; }

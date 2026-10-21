@@ -21,3 +21,4 @@ await renderer({
   build: { outDir: '../../dist/renderer', emptyOutDir: false },
 });
 await cp('assets', 'dist/assets', { recursive: true });
+await cp('legal', 'dist/legal', { recursive: true });

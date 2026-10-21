@@ -16,6 +16,7 @@ import type { GroupCredentials, GroupInput } from '../shared/group';
 import { LoginStartup } from './login-startup';
 import { HistoryStore } from './history-store';
 import { MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH, restoreWindowBounds, type WindowBounds } from './window-bounds';
+import { CONTACT_EMAIL, DEVELOPER, type AppInfo } from '../shared/app-info';
 
 let window: BrowserWindow | null = null;
 let controller: SyncController;
@@ -225,6 +226,11 @@ function createWindow() {
 }
 
 if (primaryInstance) void app.whenReady().then(async () => {
+  // Resolve from the bundled entry so native test launchers and the installed
+  // ASAR read the same application manifest rather than a launcher manifest.
+  const metadata = JSON.parse(await readFile(path.join(__dirname, '..', 'package.json'), 'utf8'));
+  if (!Number.isSafeInteger(metadata.buildNumber) || metadata.buildNumber < 1) throw new Error('앱 빌드 정보를 확인할 수 없습니다.');
+  const appInfo: AppInfo = { developer: DEVELOPER, email: CONTACT_EMAIL, version: metadata.version, buildNumber: String(metadata.buildNumber) };
   startedAtLogin = startup.startedAtLogin();
   try { preferences = validatePreferences(JSON.parse(await readFile(preferencesPath(), 'utf8'))); }
   catch { preferences = { ...DEFAULT_PREFERENCES }; }
@@ -261,9 +267,12 @@ if (primaryInstance) void app.whenReady().then(async () => {
   ipcMain.handle('clipsync:get-state', () => controller.state());
   ipcMain.handle('clipsync:preferences', () => currentPreferences());
   const trusted = (event: Electron.IpcMainInvokeEvent) => window && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame;
+  ipcMain.handle('clipsync:app-info', event => { if (!trusted(event)) throw new Error('허용되지 않은 창입니다.'); return appInfo; });
   ipcMain.handle('clipsync:connection', event => { if (!trusted(event)) throw new Error('허용되지 않은 창입니다.'); return connectionInfo(); });
   ipcMain.handle('clipsync:create-group-key', event => { if (!trusted(event)) throw new Error('허용되지 않은 창입니다.'); return createGroupKey(); });
   const actions: Record<string, (...args: never[]) => unknown> = {
+    // Fixed destination only: renderer input cannot open arbitrary protocols or URLs.
+    'contact-developer': () => shell.openExternal(`mailto:${CONTACT_EMAIL}`),
     configure: (value: unknown) => {
       const work = settingsQueue.then(() => configure(value));
       settingsQueue = work.catch(() => {});

@@ -51,6 +51,40 @@ test('resizable manager retains encrypted text, images, file references and pins
     ratios.push(geometry.widths[1] / geometry.widths[0]);
   }
   assert.ok(ratios.every(value => value > 1.5 && value < 1.7), JSON.stringify(ratios));
+  const metadata = JSON.parse(await readFile('package.json', 'utf8'));
+  const info = await page!.evaluate(() => window.clipSync.appInfo());
+  assert.deepEqual(info, { developer: 'Horizon Entertainment', email: 'apps@horizonent.co.kr', version: metadata.version, buildNumber: String(metadata.buildNumber) });
+  await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(360, 480));
+  await page!.getByRole('button', { name: '환경설정', exact: true }).click();
+  await page!.getByText('Horizon Entertainment', { exact: true }).waitFor();
+  assert.equal(await page!.getByRole('button', { name: 'apps@horizonent.co.kr', exact: true }).count(), 1);
+  assert.equal(await page!.locator('#app-version').textContent(), `버전 ${metadata.version} · 빌드 ${metadata.buildNumber}`);
+  for (const scroll of [0, 99999]) {
+    await page!.locator('.settings-content').evaluate((element, top) => { element.scrollTop = top; }, scroll);
+    const visibleFooter = await page!.locator('.settings-build-bar').evaluate(element => {
+      const r = element.getBoundingClientRect(); const dialog = element.closest('dialog')!.getBoundingClientRect();
+      return r.top >= dialog.top && r.bottom <= dialog.bottom && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth;
+    });
+    assert.equal(visibleFooter, true, 'Version and build must stay visible while settings scroll at minimum size');
+  }
+  const requests: string[] = [];
+  page!.on('request', request => { if (/^https?:/.test(request.url())) requests.push(request.url()); });
+  for (const [label, filename] of [['개인정보처리방침', 'PRIVACY-POLICY.ko.txt'], ['이용약관', 'TERMS-OF-USE.ko.txt']]) {
+    await page!.getByRole('button', { name: label, exact: true }).click();
+    const document = page!.getByRole('dialog', { name: label, exact: true });
+    await document.waitFor();
+    assert.equal(await page!.locator('#legal-body').textContent(), await readFile(path.join('legal', filename), 'utf8'));
+    assert.equal(await page!.locator('#legal-date').textContent(), '시행일 2026-10-21 · 문서 1.0');
+    await page!.locator('#legal-body').evaluate(element => { element.scrollTop = element.scrollHeight; });
+    await page!.keyboard.press('Escape');
+    await until(async () => !await document.isVisible());
+    assert.equal(await page!.locator('#settings-dialog').isVisible(), true, 'Closing a document must return to settings');
+    assert.equal(await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible()), true);
+  }
+  assert.deepEqual(requests, [], 'Reading bundled legal documents must not request an external website');
+  await page!.screenshot({ path: 'test-results/settings-developer-build.png' });
+  await page!.getByRole('button', { name: '환경설정 닫기', exact: true }).click();
+  await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(720, 820));
   await app!.evaluate(({ clipboard }) => clipboard.writeText('먼저 복사하고 고정한 항목'));
   await until(async () => (await page!.evaluate(() => window.clipSync.state())).history.length === 1);
   await page!.locator('[data-history-id]').getByRole('button', { name: '고정', exact: true }).click();

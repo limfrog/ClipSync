@@ -1,8 +1,11 @@
 const appFiles = ['dist/**/*', 'package.json', 'THIRD_PARTY_NOTICES.txt', '!node_modules/**/prebuilds/**/*.bare'];
+const metadata = require('./package.json');
 
 module.exports = {
   appId: 'dev.limfrog.clipsync',
   productName: 'ClipSync',
+  buildNumber: String(metadata.buildNumber),
+  buildVersion: `${metadata.version}.${metadata.buildNumber}`,
   directories: { output: 'release/installers' },
   files: [...appFiles],
   asar: true,
@@ -34,6 +37,7 @@ module.exports = {
     uninstallDisplayName: 'ClipSync',
   },
   mac: {
+    bundleVersion: String(metadata.buildNumber),
     icon: 'build/icons/icon.icns',
     files: [...appFiles, '!node_modules/**/prebuilds/{android-*,ios-*,linux-*,win32-*}/**/*'],
     target: [{ target: 'pkg', arch: ['arm64', 'x64'] }],

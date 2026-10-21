@@ -10,6 +10,8 @@ function decodeState(state: Omit<SyncState, 'history'> & { history?: SyncState['
 }
 
 const api: ClipSyncAPI = {
+  appInfo: () => ipcRenderer.invoke('clipsync:app-info'),
+  contactDeveloper: () => ipcRenderer.invoke('clipsync:contact-developer'),
   connection: () => ipcRenderer.invoke('clipsync:connection'),
   createGroupKey: () => ipcRenderer.invoke('clipsync:create-group-key'),
   connectGroup: input => ipcRenderer.invoke('clipsync:connect-group', input),

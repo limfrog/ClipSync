@@ -56,6 +56,7 @@
   <dialog id="settings-dialog" aria-labelledby="settings-title">
     <div class="modal-head"><h2 id="settings-title">환경설정</h2><button class="icon-btn only-icon" data-close="settings-dialog" aria-label="환경설정 닫기"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
     <div id="settings-error" class="error-message" role="alert" hidden></div>
+    <div class="settings-content">
     <form id="settings-form">
       <label for="theme">화면 테마</label><select id="theme"><option value="dark">다크</option><option value="light">라이트</option><option value="system">시스템 설정</option></select>
       <label for="shortcut-setting">창 열기·숨기기 단축키</label><input id="shortcut-setting" type="text" placeholder="CommandOrControl+Shift+V" maxlength="80" autocomplete="off" spellcheck="false" /><p class="small-note">Ctrl/Command, Alt, Shift와 영문자·숫자를 조합하세요.</p>
@@ -66,7 +67,21 @@
       <section class="section-card"><h3>창과 기록</h3><p>창 가장자리와 모서리를 드래그해 크기를 조절하세요. 크기와 위치는 다음 실행에도 유지됩니다. ×·Esc는 창을 숨기고 동기화를 계속합니다. 종료 버튼은 앱을 완전히 닫습니다.</p></section>
       <button class="button primary full" type="submit">설정 저장</button>
     </form>
-    <div class="settings-build-bar"><span>ClipSync · 클립보드 매니저</span><span>텍스트 · 이미지 · 파일</span></div>
+    <section class="developer-info" aria-labelledby="developer-title">
+      <h3 id="developer-title">개발자 및 문의</h3>
+      <p id="developer-name">Horizon Entertainment</p>
+      <button id="contact-developer" class="contact-link" type="button" title="메일 프로그램으로 문의 작성">apps@horizonent.co.kr</button>
+      <p class="small-note">누르면 메일 프로그램이 열립니다. 문의 내용은 자동으로 전송되지 않습니다.</p>
+      <div class="legal-links"><button id="open-privacy" class="button secondary" type="button">개인정보처리방침</button><button id="open-terms" class="button secondary" type="button">이용약관</button></div>
+    </section>
+    </div>
+    <footer class="settings-build-bar" aria-label="앱 버전 정보"><span>ClipSync</span><span id="app-version" role="status">버전 정보 확인 중</span></footer>
+  </dialog>
+
+  <dialog id="legal-dialog" aria-labelledby="legal-title">
+    <div class="modal-head"><h2 id="legal-title">개인정보처리방침</h2><button class="icon-btn only-icon" data-close="legal-dialog" aria-label="문서 닫기"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+    <p id="legal-date" class="small-note"></p>
+    <article id="legal-body" class="legal-body" tabindex="0" aria-label="문서 내용"></article>
   </dialog>
 </body>
 </html>

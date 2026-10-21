@@ -1,8 +1,12 @@
 import { packager } from '@electron/packager';
+import { readFile } from 'node:fs/promises';
+
+const metadata = JSON.parse(await readFile('package.json', 'utf8'));
 
 const paths = await packager({
   dir: '.',
   name: 'ClipSync',
+  buildVersion: process.platform === 'win32' ? `${metadata.version}.${metadata.buildNumber}` : String(metadata.buildNumber),
   out: 'release',
   overwrite: true,
   asar: true,

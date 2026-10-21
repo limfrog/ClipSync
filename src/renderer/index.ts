@@ -3,6 +3,9 @@ import type { ClipSyncAPI, Result, SyncState } from '../shared/api';
 import { DEFAULT_PREFERENCES, type HistoryItem, type Preferences } from '../shared/history';
 import type { ConnectionInfo } from '../shared/group';
 import type { TransferState } from '../shared/transfers';
+import { LEGAL_EFFECTIVE_DATE, LEGAL_VERSION, type AppInfo } from '../shared/app-info';
+import privacyPolicy from '../../legal/PRIVACY-POLICY.ko.txt?raw';
+import termsOfUse from '../../legal/TERMS-OF-USE.ko.txt?raw';
 
 declare global { interface Window { clipSync: ClipSyncAPI } }
 function element<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -12,6 +15,7 @@ function element<T extends HTMLElement = HTMLElement>(id: string): T {
 }
 const connection = element<HTMLDialogElement>('connection-dialog');
 const settings = element<HTMLDialogElement>('settings-dialog');
+const legal = element<HTMLDialogElement>('legal-dialog');
 let current: SyncState;
 let preferences: Preferences = { ...DEFAULT_PREFERENCES };
 let busy = false;
@@ -54,6 +58,11 @@ function updatePreferences(value: Preferences) {
   document.documentElement.dataset.theme = value.theme;
   element('pin-window').setAttribute('aria-pressed', String(value.alwaysOnTop));
   element('shortcut').textContent = value.shortcutAvailable === false ? '단축키 사용 불가' : value.shortcut.replace(/CommandOrControl/g, 'Ctrl/⌘').replaceAll('+', ' + ');
+}
+function updateAppInfo(value: AppInfo) {
+  element('developer-name').textContent = value.developer;
+  element('contact-developer').textContent = value.email;
+  element('app-version').textContent = `버전 ${value.version} · 빌드 ${value.buildNumber}`;
 }
 function render(state: SyncState) {
   current = state;
@@ -159,7 +168,10 @@ for (const id of ['open-connection', 'open-settings']) element(id).addEventListe
     void window.clipSync.connection().then(updateConnection).catch(() => showError('연결 정보를 읽을 수 없습니다.'));
   }
   else {
-    try { updatePreferences(await window.clipSync.preferences()); } catch { showError('설정을 읽을 수 없습니다.'); return; }
+    try {
+      const [prefs, info] = await Promise.all([window.clipSync.preferences(), window.clipSync.appInfo()]);
+      updatePreferences(prefs); updateAppInfo(info);
+    } catch { showError('설정을 읽을 수 없습니다.'); return; }
     element<HTMLSelectElement>('theme').value = preferences.theme;
     element<HTMLInputElement>('shortcut-setting').value = preferences.shortcut;
     element<HTMLInputElement>('retain-history').checked = preferences.retainHistory;
@@ -171,6 +183,16 @@ for (const id of ['open-connection', 'open-settings']) element(id).addEventListe
   }
 });
 document.querySelectorAll<HTMLButtonElement>('[data-close]').forEach(button => button.addEventListener('click', () => element<HTMLDialogElement>(button.dataset.close!).close()));
+for (const [id, title, text] of [['open-privacy', '개인정보처리방침', privacyPolicy], ['open-terms', '이용약관', termsOfUse]]) element(id).addEventListener('click', () => {
+  element('legal-title').textContent = title;
+  element('legal-date').textContent = `시행일 ${LEGAL_EFFECTIVE_DATE} · 문서 ${LEGAL_VERSION}`;
+  // Local, bundled plain text: no network request or HTML execution.
+  element('legal-body').textContent = text;
+  legal.showModal();
+  element('legal-body').scrollTop = 0;
+  element('legal-body').focus();
+});
+element('contact-developer').addEventListener('click', () => { void act(() => window.clipSync.contactDeveloper()); });
 element('search').addEventListener('input', renderHistory);
 document.querySelectorAll<HTMLButtonElement>('[data-filter]').forEach(button => button.addEventListener('click', () => {
   filter = button.dataset.filter!;
@@ -217,7 +239,7 @@ element('quit').addEventListener('click', () => { void act(() => window.clipSync
 element('open-downloads').addEventListener('click', () => { void act(() => window.clipSync.openDownloads()); });
 element('clear-history').addEventListener('click', () => { void act(() => window.clipSync.history('clear'), '고정한 항목을 남기고 기록을 비웠어요.'); });
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && !connection.open && !settings.open) { event.preventDefault(); void act(() => window.clipSync.hide()); }
+  if (event.key === 'Escape' && !connection.open && !settings.open && !legal.open) { event.preventDefault(); void act(() => window.clipSync.hide()); }
 });
 element('history-list').addEventListener('click', dispatchAction);
 element('transfer-list').addEventListener('click', dispatchAction);
@@ -237,4 +259,4 @@ function dispatchAction(event: MouseEvent) {
 }
 window.clipSync.subscribe(render);
 window.clipSync.onPreferences(updatePreferences);
-void Promise.all([window.clipSync.state().then(render), window.clipSync.preferences().then(updatePreferences), window.clipSync.connection().then(updateConnection)]).catch(() => showError('앱을 다시 실행해 주세요.'));
+void Promise.all([window.clipSync.state().then(render), window.clipSync.preferences().then(updatePreferences), window.clipSync.connection().then(updateConnection), window.clipSync.appInfo().then(updateAppInfo)]).catch(() => showError('앱을 다시 실행해 주세요.'));
