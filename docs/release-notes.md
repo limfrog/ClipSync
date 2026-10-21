@@ -1,11 +1,13 @@
-# ClipSync 0.4.5 · 창 상단 드래그와 새 아이콘
+# ClipSync 0.4.6 · 중복 수신 방지·가독성·부팅 시 시작
 
-제목 줄 위쪽 여백을 잡아도 창을 이동할 수 있도록 드래그 영역을 넓혔습니다. 설정·고정·숨김 버튼은 클릭할 수 있고, 기기 목록은 가로 스크롤을 유지합니다.
+이미 받은 파일은 이름·크기와 SHA-256을 확인해 기존 파일을 재사용합니다. 양쪽이 0.4.6이면 파일 데이터 재전송을 생략하면서 클립보드는 기존 파일로 갱신합니다. 내용이 다른 동명 파일은 별도로 보관합니다. 한글 파일명과 번호가 붙은 기존 파일, 재시작 이후에도 비교하며 삭제·변경된 파일은 다시 받습니다. 0.4.5와 연결하면 정상 전송 후 중복 저장을 방지합니다.
 
-투명 배경에 청록색 클립보드·동기화 심볼을 담은 새 A 아이콘을 앱 로고와 Windows·Mac 설치 아이콘에 반영했습니다. Mac 메뉴바는 배경에 따라 흰색·검은색으로 표시되는 단색 템플릿을 사용합니다.
+다크·라이트 화면의 글자와 버튼·입력창 경계를 더 선명하게 바꿨습니다. 본문은 13px, 보조 글자는 최소 12px로 키웠습니다.
 
-[검증 기록](https://github.com/limfrog/ClipSync/blob/main/docs/window-drag-verification.md) · [아이콘 디자인](https://github.com/limfrog/ClipSync/blob/main/docs/icon-concepts.md)
+환경설정의 ‘창 항상 위에 고정’을 ‘부팅 시 시작’으로 교체했습니다. 체크하면 사용자 로그인 후 트레이·메뉴바에서 자동으로 시작하고, 해제하면 자동 시작 등록을 제거합니다. Mac에서 시스템 승인이 필요한 경우 설정 화면에 안내합니다. 상단의 핀 버튼은 유지합니다. 저장한 연결은 그대로 복원하며 앱 중복 실행을 방지합니다.
 
-업데이트 전 양쪽 앱을 오른쪽 아래 **종료**로 완전히 닫으세요. ×는 창을 숨기는 동작입니다. 저장한 연결 키·비밀번호는 유지됩니다.
+[기능과 검증 기록](https://github.com/limfrog/ClipSync/blob/main/docs/receipt-startup-verification.md)
 
-Windows x64: `ClipSync-0.4.5-Windows-x64-Setup.exe` · Apple Silicon: `ClipSync-0.4.5-macOS-arm64.pkg` · Intel Mac: `ClipSync-0.4.5-macOS-x64.pkg`. SHA-256은 `SHA256SUMS.txt`에서 확인하세요. Windows 배포자 인증서 서명·Apple 공증은 포함하지 않으며, macOS 앱은 ad-hoc 서명입니다.
+설치 전 기존 앱을 오른쪽 아래 **종료**로 완전히 닫으세요. ×는 창을 숨깁니다. 키·비밀번호와 기존 설정은 유지합니다. 중복 파일의 데이터 전송 생략은 양쪽 앱을 업데이트하면 사용할 수 있습니다.
+
+Windows x64: `ClipSync-0.4.6-Windows-x64-Setup.exe` · Apple Silicon: `ClipSync-0.4.6-macOS-arm64.pkg` · Intel Mac: `ClipSync-0.4.6-macOS-x64.pkg`. `SHA256SUMS.txt`를 제공합니다. Windows 배포자 인증서 서명·Apple 공증은 포함하지 않으며, Mac 앱은 ad-hoc 서명입니다.

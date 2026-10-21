@@ -17,7 +17,7 @@ export interface Preferences {
   theme: 'system' | 'dark' | 'light';
   alwaysOnTop: boolean;
   startOnLogin: boolean;
-  startupStatus?: 'unsupported' | 'disabled' | 'enabled' | 'requires-approval' | 'blocked';
+  startupStatus?: 'unsupported' | 'unavailable' | 'disabled' | 'enabled' | 'requires-approval' | 'blocked';
   shortcut: string;
   shortcutAvailable?: boolean;
 }

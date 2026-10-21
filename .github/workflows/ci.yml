@@ -36,7 +36,10 @@ jobs:
       - name: Verify Windows startup registration and hidden launch
         if: runner.os == 'Windows'
         run: |
-          $env:CLIPSYNC_EXECUTABLE = (Resolve-Path 'release/installers/win-unpacked/ClipSync.exe').Path
+          $startupTestFolder = Join-Path $env:RUNNER_TEMP 'ClipSync 설치 검증'
+          New-Item -ItemType Directory -Force -Path $startupTestFolder | Out-Null
+          Copy-Item 'release/installers/win-unpacked/*' -Destination $startupTestFolder -Recurse -Force
+          $env:CLIPSYNC_EXECUTABLE = Join-Path $startupTestFolder 'ClipSync.exe'
           bash scripts/check-ci.sh test:startup
       - name: Package installed Intel Mac app for native startup verification
         if: matrix.os == 'macos-26-intel'

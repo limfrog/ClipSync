@@ -38,9 +38,10 @@ test('packaged app registers native login startup, restores it, starts hidden an
   await until(async () => !await page.locator('#settings-dialog').isVisible() || Boolean(await page.locator('#settings-error').textContent()));
   assert.equal(await page.locator('#settings-dialog').isVisible(), false, await page.locator('#settings-error').textContent() ?? 'Startup settings were not saved');
   await until(async () => (await page.evaluate(() => window.clipSync.preferences())).startOnLogin);
-  const settings = await app!.evaluate(({ app }) => app.getLoginItemSettings(process.platform === 'win32' ? { path: process.execPath, args: ['--startup'] } : {}));
+  const settings = await app!.evaluate(({ app }) => app.getLoginItemSettings(process.platform === 'win32' ? { path: `"${process.execPath}"`, args: ['--startup'] } : {}));
   if (process.platform === 'win32') {
-    assert.equal(settings.openAtLogin, true); assert.equal(settings.executableWillLaunchAtLogin, true);
+    assert.equal(settings.executableWillLaunchAtLogin, true);
+    assert.ok(settings.launchItems.some(item => item.name === 'ClipSync' && item.scope === 'user' && item.enabled && item.args[0] === '--startup'));
     const registry = await promisify(execFile)('reg.exe', ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/v', 'ClipSync']);
     assert.ok(registry.stdout.includes('--startup')); assert.ok(registry.stdout.includes('ClipSync.exe'));
   } else {
@@ -62,6 +63,7 @@ test('packaged app registers native login startup, restores it, starts hidden an
   await page.getByRole('checkbox', { name: '부팅 시 시작', exact: true }).uncheck();
   await page.getByRole('button', { name: '설정 저장' }).click();
   await until(async () => !(await page.evaluate(() => window.clipSync.preferences())).startOnLogin);
-  const disabled = await app!.evaluate(({ app }) => app.getLoginItemSettings(process.platform === 'win32' ? { path: process.execPath, args: ['--startup'] } : {}));
-  assert.equal(disabled.openAtLogin, false);
+  const disabled = await app!.evaluate(({ app }) => app.getLoginItemSettings(process.platform === 'win32' ? { path: `"${process.execPath}"`, args: ['--startup'] } : {}));
+  if (process.platform === 'win32') assert.ok(!disabled.launchItems.some(item => item.name === 'ClipSync' && item.scope === 'user'));
+  else assert.equal(disabled.openAtLogin, false);
 });

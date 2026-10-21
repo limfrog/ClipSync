@@ -156,8 +156,8 @@ for (const id of ['open-connection', 'open-settings']) element(id).addEventListe
     element<HTMLInputElement>('shortcut-setting').value = preferences.shortcut;
     const startup = element<HTMLInputElement>('start-on-login');
     startup.checked = preferences.startOnLogin;
-    startup.disabled = preferences.startupStatus === 'unsupported';
-    element('startup-note').textContent = preferences.startupStatus === 'requires-approval' ? '시스템 설정 > 일반 > 로그인 항목에서 ClipSync를 허용해 주세요.' : preferences.startupStatus === 'blocked' ? 'Windows 설정 > 앱 > 시작 프로그램에서 ClipSync를 허용해 주세요.' : preferences.startupStatus === 'unsupported' ? '부팅 시 시작은 설치된 Windows·Mac 앱에서 사용할 수 있습니다.' : '컴퓨터에 로그인하면 트레이·메뉴바에서 자동으로 시작합니다.';
+    startup.disabled = preferences.startupStatus === 'unsupported' || preferences.startupStatus === 'unavailable';
+    element('startup-note').textContent = preferences.startupStatus === 'requires-approval' ? '시스템 설정 > 일반 > 로그인 항목에서 ClipSync를 허용해 주세요.' : preferences.startupStatus === 'blocked' ? 'Windows 설정 > 앱 > 시작 프로그램에서 ClipSync를 허용해 주세요.' : preferences.startupStatus === 'unavailable' ? '자동 시작 설정을 확인할 수 없습니다. 시스템의 로그인 항목 설정을 확인해 주세요.' : preferences.startupStatus === 'unsupported' ? '부팅 시 시작은 설치된 Windows·Mac 앱에서 사용할 수 있습니다.' : '컴퓨터에 로그인하면 트레이·메뉴바에서 자동으로 시작합니다.';
     settings.showModal();
   }
 });

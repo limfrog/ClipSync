@@ -4,15 +4,24 @@ import type { Preferences } from '../shared/history';
 type NativeLogin = Pick<App, 'isPackaged' | 'getLoginItemSettings' | 'setLoginItemSettings'>;
 export class LoginStartup {
   constructor(private readonly app: NativeLogin, private readonly platform = process.platform, private readonly executable = process.execPath) {}
-  private options() { return this.platform === 'win32' ? { path: this.executable, args: ['--startup'] } : {}; }
+  private options() { return this.platform === 'win32' ? { path: `"${this.executable}"`, args: ['--startup'] } : {}; }
   info(): Pick<Preferences, 'startOnLogin' | 'startupStatus'> {
     if (!this.app.isPackaged || !['win32', 'darwin'].includes(this.platform)) return { startOnLogin: false, startupStatus: 'unsupported' };
-    const native = this.app.getLoginItemSettings(this.options());
+    let native: Electron.LoginItemSettings;
+    try { native = this.app.getLoginItemSettings(this.options()); }
+    catch { return { startOnLogin: false, startupStatus: 'unavailable' }; }
+    if (this.platform === 'win32') {
+      // Electron's openAtLogin only looks up the default AppUserModelID key,
+      // even when setLoginItemSettings uses our custom name. launchItems also
+      // reflects Task Manager's approval state for this specific user entry.
+      const item = native.launchItems.find(item => item.scope === 'user' && item.name === 'ClipSync' && item.args.length === 1 && item.args[0] === '--startup');
+      return { startOnLogin: item?.enabled === true, startupStatus: !item ? 'disabled' : item.enabled ? 'enabled' : 'blocked' };
+    }
     if (this.platform === 'darwin' && native.status === 'requires-approval') return { startOnLogin: true, startupStatus: 'requires-approval' };
-    if (this.platform === 'win32' && native.openAtLogin && !native.executableWillLaunchAtLogin) return { startOnLogin: false, startupStatus: 'blocked' };
     return { startOnLogin: native.openAtLogin, startupStatus: native.openAtLogin ? 'enabled' : 'disabled' };
   }
   set(enabled: boolean) {
+    if (this.info().startupStatus === 'unavailable') throw new Error('자동 시작 설정을 확인할 수 없습니다. 시스템의 로그인 항목 설정을 확인해 주세요.');
     if (this.info().startupStatus === 'unsupported') {
       if (enabled) throw new Error('부팅 시 시작은 설치된 Windows·Mac 앱에서 사용할 수 있습니다.');
       return;
@@ -26,6 +35,8 @@ export class LoginStartup {
   }
   startedAtLogin() {
     if (this.info().startupStatus === 'unsupported') return false;
-    return process.argv.includes('--startup') || this.platform === 'darwin' && this.app.getLoginItemSettings(this.options()).wasOpenedAtLogin;
+    if (process.argv.includes('--startup')) return true;
+    try { return this.platform === 'darwin' && this.app.getLoginItemSettings(this.options()).wasOpenedAtLogin; }
+    catch { return false; }
   }
 }
