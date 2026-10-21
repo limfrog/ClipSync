@@ -1,14 +1,14 @@
 # ClipSync 설치 프로그램
 
-현재 버전은 창 크기 조절·Windows 아이콘 확대·선택 항목 강조·기록 유지 옵션·Mac 창 열기 수정을 포함한 0.4.7입니다. 기록을 다음 실행에 남기려면 환경설정에서 새 옵션을 켜세요. Mac 메뉴바는 배경에 따라 흰색·검은색으로 표시되는 전용 템플릿 아이콘을 사용합니다. [릴리스](https://github.com/limfrog/ClipSync/releases/tag/v0.4.7) · [0.4.7 검증 기록](window-history-verification.md) · [0.4.6 중복·자동 시작 검증](receipt-startup-verification.md) · [0.4.5 창·아이콘 검증 기록](window-drag-verification.md) · [0.4.4 발견 검증 기록](broadcast-discovery-verification.md) · [Mac–Windows 실물 검증 절차](physical-verification.md).
+현재 버전은 개발자·연락처, 설정 하단의 버전·빌드 표시, 오프라인 개인정보처리방침·이용약관을 포함한 **0.4.8 · 빌드 8**입니다. 개발자는 Horizon Entertainment, 문의 이메일은 apps@horizonent.co.kr입니다. 창 크기 조절·선택 강조·기록 유지 등 기존 기능도 포함합니다. 기록을 다음 실행에 남기려면 환경설정에서 새 옵션을 켜세요. Mac 메뉴바는 배경에 따라 흰색·검은색으로 표시되는 전용 템플릿 아이콘을 사용합니다. [릴리스](https://github.com/limfrog/ClipSync/releases/tag/v0.4.8) · [0.4.8 개발자·정책 검증](developer-legal-verification.md) · [0.4.7 검증 기록](window-history-verification.md) · [0.4.6 중복·자동 시작 검증](receipt-startup-verification.md) · [0.4.5 창·아이콘 검증 기록](window-drag-verification.md) · [0.4.4 발견 검증 기록](broadcast-discovery-verification.md) · [Mac–Windows 실물 검증 절차](physical-verification.md).
 
 | 대상 | 파일 | 설치 위치 |
 | --- | --- | --- |
-| Windows x64 | [ClipSync-0.4.7-Windows-x64-Setup.exe](https://github.com/limfrog/ClipSync/releases/download/v0.4.7/ClipSync-0.4.7-Windows-x64-Setup.exe) | `%LOCALAPPDATA%\Programs\ClipSync` |
-| macOS Apple Silicon | [ClipSync-0.4.7-macOS-arm64.pkg](https://github.com/limfrog/ClipSync/releases/download/v0.4.7/ClipSync-0.4.7-macOS-arm64.pkg) | `/Applications/ClipSync.app` |
-| macOS Intel | [ClipSync-0.4.7-macOS-x64.pkg](https://github.com/limfrog/ClipSync/releases/download/v0.4.7/ClipSync-0.4.7-macOS-x64.pkg) | `/Applications/ClipSync.app` |
+| Windows x64 | [ClipSync-0.4.8-Windows-x64-Setup.exe](https://github.com/limfrog/ClipSync/releases/download/v0.4.8/ClipSync-0.4.8-Windows-x64-Setup.exe) | `%LOCALAPPDATA%\Programs\ClipSync` |
+| macOS Apple Silicon | [ClipSync-0.4.8-macOS-arm64.pkg](https://github.com/limfrog/ClipSync/releases/download/v0.4.8/ClipSync-0.4.8-macOS-arm64.pkg) | `/Applications/ClipSync.app` |
+| macOS Intel | [ClipSync-0.4.8-macOS-x64.pkg](https://github.com/limfrog/ClipSync/releases/download/v0.4.8/ClipSync-0.4.8-macOS-x64.pkg) | `/Applications/ClipSync.app` |
 
-SHA-256은 [SHA256SUMS.txt](https://github.com/limfrog/ClipSync/releases/download/v0.4.7/SHA256SUMS.txt)에서 확인할 수 있습니다.
+SHA-256은 [SHA256SUMS.txt](https://github.com/limfrog/ClipSync/releases/download/v0.4.8/SHA256SUMS.txt)에서 확인할 수 있습니다.
 
 각 파일은 500,000,000바이트보다 작습니다. Windows 설치 화면은 한국어·영어를 지원하며 시작 메뉴·바탕화면 바로가기와 제거 프로그램을 포함합니다. Mac은 자기 CPU에 맞는 PKG를 선택해야 합니다. PKG 설치에는 관리자 권한이 필요합니다. 프로그램을 종료한 뒤 설치하세요.
 
@@ -16,7 +16,7 @@ SHA-256은 [SHA256SUMS.txt](https://github.com/limfrog/ClipSync/releases/downloa
 
 ## 현재 검증과 과거 기록
 
-현재 릴리스 워크플로는 실제 패키지의 앱 버전·파일 구성·선택한 아이콘을 검사합니다. Windows는 실행 파일과 설치 프로그램의 아이콘 리소스를 모두 비교하고, Mac은 두 앱 번들의 ICNS와 `codesign --verify --deep --strict`, PKG 확장을 검사합니다. 배포 파일을 공개 HTTPS 주소에서 다시 받아 SHA-256을 대조합니다. Windows·Mac의 실제 크기 조절·기록 암호화·이미지 복원·포커스 유지와 패키지의 자동 시작 등록·조회·해제·숨김 실행을 확인합니다. 운영체제 재부팅 자체나 실제 설치 화면·Mac 메뉴바 색 전환을 클라우드에서 실행해 확인하는 검사는 아닙니다.
+현재 릴리스 워크플로는 실제 패키지의 앱 버전·빌드번호·정책 문서 원문·파일 구성·선택한 아이콘을 검사합니다. Windows 네이티브 파일 버전은 0.4.8.8, Mac CFBundleVersion은 8입니다. Windows는 실행 파일과 설치 프로그램의 아이콘 리소스를 모두 비교하고, Mac은 두 앱 번들의 ICNS와 `codesign --verify --deep --strict`, PKG 확장을 검사합니다. 배포 파일을 공개 HTTPS 주소에서 다시 받아 SHA-256을 대조합니다. Windows·Mac의 실제 크기 조절·기록 암호화·이미지 복원·포커스 유지와 패키지의 자동 시작 등록·조회·해제·숨김 실행을 확인합니다. 운영체제 재부팅 자체나 실제 설치 화면·Mac 메뉴바 색 전환을 클라우드에서 실행해 확인하는 검사는 아닙니다.
 
 사용자는 0.4.4에서 Mac–Windows 연결·텍스트·이미지·한글·300MB 파일, 자동 재연결과 외부 네트워크 연결 성공을 확인했습니다. 아래 내용은 **초기 0.2.0 빌드의 검증 기록**입니다.
 
