@@ -41,7 +41,7 @@ test('packaged app registers native login startup, restores it, starts hidden an
   const settings = await app!.evaluate(({ app }) => app.getLoginItemSettings(process.platform === 'win32' ? { path: `"${process.execPath}"`, args: ['--startup'] } : {}));
   if (process.platform === 'win32') {
     assert.equal(settings.executableWillLaunchAtLogin, true);
-    assert.ok(settings.launchItems.some(item => item.name === 'ClipSync' && item.scope === 'user' && item.enabled && item.args[0] === '--startup'));
+    assert.ok(settings.launchItems.some(item => item.name === 'ClipSync' && item.scope === 'user' && item.enabled));
     const registry = await promisify(execFile)('reg.exe', ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', '/v', 'ClipSync']);
     assert.ok(registry.stdout.includes('--startup')); assert.ok(registry.stdout.includes('ClipSync.exe'));
   } else {
@@ -49,7 +49,7 @@ test('packaged app registers native login startup, restores it, starts hidden an
   }
   const saved = JSON.parse(await readFile(path.join(profile, 'preferences.json'), 'utf8'));
   assert.equal(saved.startOnLogin, true); assert.equal(saved.alwaysOnTop, true);
-  console.log(`Native ${process.platform} login item: ${settings.status ?? settings.openAtLogin}`);
+  console.log(`Native ${process.platform} login item: ${process.platform === 'win32' ? settings.executableWillLaunchAtLogin : settings.status}`);
   await app!.close();
   page = await launch(true);
   assert.equal(await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible()), false, 'Login startup must stay in the tray/menu bar');

@@ -21,11 +21,11 @@ let transferSignature = '';
 let peerSignature = '';
 let toastTimer: ReturnType<typeof setTimeout>;
 
-function notice(message: string) {
+function notice(message: string, duration = 3000) {
   element('notice').textContent = message;
   element('notice').hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { element('notice').hidden = true; }, 3000);
+  toastTimer = setTimeout(() => { element('notice').hidden = true; }, duration);
 }
 function showError(message: string | null) {
   for (const [id, visible] of [['error', !connection.open && !settings.open], ['connection-error', connection.open], ['settings-error', settings.open]] as const) {
@@ -194,8 +194,13 @@ element('settings-form').addEventListener('submit', event => {
   event.preventDefault();
   void act(async () => {
     const result = await window.clipSync.configure({ ...preferences, theme: element<HTMLSelectElement>('theme').value as Preferences['theme'], shortcut: element<HTMLInputElement>('shortcut-setting').value.trim(), startOnLogin: element<HTMLInputElement>('start-on-login').checked });
-    if (result.ok) settings.close(); return result;
-  }, '설정을 저장했어요.');
+    if (result.ok) {
+      updatePreferences(await window.clipSync.preferences());
+      settings.close();
+      notice(preferences.startupStatus === 'requires-approval' ? '시스템 설정 > 일반 > 로그인 항목에서 ClipSync를 허용해 주세요.' : '설정을 저장했어요.', preferences.startupStatus === 'requires-approval' ? 7000 : 3000);
+    }
+    return result;
+  });
 });
 element('pin-window').addEventListener('click', () => { void act(() => window.clipSync.configure({ ...preferences, alwaysOnTop: !preferences.alwaysOnTop })); });
 element('hide-window').addEventListener('click', () => { void act(() => window.clipSync.hide()); });

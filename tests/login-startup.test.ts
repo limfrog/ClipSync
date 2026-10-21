@@ -10,7 +10,7 @@ function native(packaged = true) {
     getLoginItemSettings: (options: unknown) => { calls.push({ get: options }); return state; },
     setLoginItemSettings: (options: { openAtLogin: boolean; enabled?: boolean }) => {
       calls.push({ set: options });
-      state = { ...state, openAtLogin: options.openAtLogin, executableWillLaunchAtLogin: options.openAtLogin && options.enabled === true, status: options.openAtLogin ? 'enabled' : 'not-registered', launchItems: options.openAtLogin ? [{ name: 'ClipSync', scope: 'user', args: ['--startup'], enabled: options.enabled === true }] : [] };
+      state = { ...state, openAtLogin: options.openAtLogin, executableWillLaunchAtLogin: options.openAtLogin && options.enabled === true, status: options.openAtLogin ? 'enabled' : 'not-registered', launchItems: options.openAtLogin ? [{ name: 'ClipSync', scope: 'user', args: [], enabled: options.enabled === true }] : [] };
     },
   } as unknown as ConstructorParameters<typeof LoginStartup>[0];
   return { app, calls, setState: (patch: Partial<typeof state>) => { state = { ...state, ...patch }; } };
@@ -27,7 +27,7 @@ test('Windows registers the installed executable and hidden-start argument, then
 });
 
 test('Windows respects an externally disabled startup item until the user explicitly enables it', () => {
-  const n = native(); n.setState({ openAtLogin: false, executableWillLaunchAtLogin: false, launchItems: [{ name: 'ClipSync', scope: 'user', args: ['--startup'], enabled: false }] });
+  const n = native(); n.setState({ openAtLogin: false, executableWillLaunchAtLogin: false, launchItems: [{ name: 'ClipSync', scope: 'user', args: [], enabled: false }] });
   const startup = new LoginStartup(n.app, 'win32');
   assert.deepEqual(startup.info(), { startOnLogin: false, startupStatus: 'blocked' });
   startup.set(true); assert.equal(startup.info().startupStatus, 'enabled');

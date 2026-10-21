@@ -14,7 +14,9 @@ export class LoginStartup {
       // Electron's openAtLogin only looks up the default AppUserModelID key,
       // even when setLoginItemSettings uses our custom name. launchItems also
       // reflects Task Manager's approval state for this specific user entry.
-      const item = native.launchItems.find(item => item.scope === 'user' && item.name === 'ClipSync' && item.args.length === 1 && item.args[0] === '--startup');
+      // Chromium excludes --switches from launchItems.args, so that list cannot
+      // verify --startup. The query already filters by this executable's path.
+      const item = native.launchItems.find(item => item.scope === 'user' && item.name === 'ClipSync');
       return { startOnLogin: item?.enabled === true, startupStatus: !item ? 'disabled' : item.enabled ? 'enabled' : 'blocked' };
     }
     if (this.platform === 'darwin' && native.status === 'requires-approval') return { startOnLogin: true, startupStatus: 'requires-approval' };
