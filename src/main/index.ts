@@ -268,7 +268,7 @@ if (primaryInstance) void app.whenReady().then(async () => {
   if (process.platform === 'win32' && app.isPackaged) {
     // The custom NSIS installer creates this shortcut; associate toast notifications
     // with the same installed app instead of an anonymous Electron process.
-    try { shell.writeShortcutLink(path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'ClipSync', 'ClipSync.lnk'), 'update', { appUserModelId: 'dev.limfrog.clipsync' }); } catch { /* In-app update notice also works without a Start menu shortcut. */ }
+    try { shell.writeShortcutLink(path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'ClipSync', 'ClipSync.lnk'), 'update', { target: process.execPath, appUserModelId: 'dev.limfrog.clipsync' }); } catch { /* In-app update notice also works without a Start menu shortcut. */ }
   }
   startedAtLogin = startup.startedAtLogin();
   try { preferences = validatePreferences(JSON.parse(await readFile(preferencesPath(), 'utf8'))); }
