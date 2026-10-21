@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import type { HistoryItem } from '../shared/history';
 import type { TransferState } from '../shared/transfers';
 
-/** Session-only history. Previews cross IPC; full text stays in bounded memory. */
+export interface HistoryEntry { item: HistoryItem; text?: string }
+
+/** Previews cross IPC; full text stays in bounded main-process memory. */
 export class ClipboardHistory {
   revision = 0;
   private items: HistoryItem[] = [];
@@ -10,6 +12,18 @@ export class ClipboardHistory {
   private textBytes = 0;
 
   state(): HistoryItem[] { return this.items.map(item => ({ ...item, ...(item.transfer ? { transfer: { ...item.transfer } } : {}) })); }
+
+  snapshot(): HistoryEntry[] { return this.state().map(item => ({ item, ...(item.type === 'text' ? { text: this.texts.get(item.id) } : {}) })); }
+
+  restore(entries: HistoryEntry[]) {
+    // New copies captured during startup take precedence over saved history.
+    for (const { item, text } of entries) {
+      if (this.items.some(current => current.id === item.id)) continue;
+      this.items.push({ ...item });
+      if (item.type === 'text' && text !== undefined) { this.texts.set(item.id, text); this.textBytes += Buffer.byteLength(text); }
+    }
+    this.revision++; this.trim();
+  }
 
   recordText(text: string, source: HistoryItem['source']) {
     if (!text || text.startsWith('clipsync://')) return;

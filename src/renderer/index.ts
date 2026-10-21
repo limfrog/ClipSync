@@ -19,6 +19,8 @@ let filter = 'all';
 let historySignature = '';
 let transferSignature = '';
 let peerSignature = '';
+let selectedHistoryId = '';
+let latestCopy = '';
 let toastTimer: ReturnType<typeof setTimeout>;
 
 function notice(message: string, duration = 3000) {
@@ -108,13 +110,16 @@ function transferCard(transfer: TransferState) {
   }
   row.append(actions); return row;
 }
-function historyCard(item: HistoryItem, latest: boolean) {
+function historyCard(item: HistoryItem, selected: boolean) {
   const card = item.transfer ? transferCard(item.transfer) : document.createElement('article');
-  card.classList.add('clip-card'); card.classList.toggle('latest-active', latest); card.dataset.historyId = item.id;
+  card.classList.add('clip-card'); card.classList.toggle('latest-active', selected); card.dataset.historyId = item.id;
+  if (selected) card.setAttribute('aria-current', 'true');
   const top = document.createElement('div'); top.className = 'clip-top';
   const type = document.createElement('span'); type.className = 'clip-type'; type.textContent = item.type === 'text' ? (/^https?:\/\/\S+$/.test(item.preview) ? 'LINK' : 'TEXT') : item.type === 'image' ? 'IMAGE' : 'FILE';
   const time = document.createElement('time'); time.dateTime = item.copiedAt; time.textContent = new Date(item.copiedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-  top.append(type, time); card.prepend(top);
+  const meta = document.createElement('div'); meta.className = 'clip-meta';
+  if (selected) { const badge = document.createElement('span'); badge.className = 'selection-badge'; badge.textContent = '✓ 선택됨'; meta.append(badge); }
+  meta.append(time); top.append(type, meta); card.prepend(top);
   if (item.type === 'text' || item.mediaId) {
     const preview = actionButton(item.preview, 'copy', item.id, 'clip-preview'); preview.title = '클릭하여 다시 복사'; card.append(preview);
     if (item.thumbnail) { const image = document.createElement('img'); image.className = 'media-preview'; image.src = item.thumbnail; image.alt = '클립보드 이미지 미리보기'; preview.append(image); }
@@ -130,12 +135,15 @@ function historyCard(item: HistoryItem, latest: boolean) {
 }
 function renderHistory() {
   if (!current) return;
+  const newest = current.history[0];
+  const copy = newest ? `${newest.id}:${newest.copiedAt}` : '';
+  if (copy !== latestCopy || !current.history.some(item => item.id === selectedHistoryId)) { selectedHistoryId = newest?.id ?? ''; latestCopy = copy; }
   const query = element<HTMLInputElement>('search').value.toLocaleLowerCase();
-  const key = JSON.stringify([current.history, query, filter]);
+  const key = JSON.stringify([current.history, query, filter, selectedHistoryId]);
   if (key === historySignature) return;
   historySignature = key;
   const items = current.history.filter(item => (filter === 'all' || (filter === 'pinned' ? item.pinned : item.type === filter)) && item.preview.toLocaleLowerCase().includes(query)).sort((a, b) => Number(b.pinned) - Number(a.pinned));
-  const list = element('history-list'); list.replaceChildren(...items.map((item, index) => historyCard(item, index === 0)));
+  const list = element('history-list'); list.replaceChildren(...items.map(item => historyCard(item, item.id === selectedHistoryId)));
   if (!items.length) {
     const empty = document.createElement('div'); empty.className = 'empty-history';
     const icon = document.createElement('span'); icon.className = 'empty-icon'; icon.textContent = '▤'; icon.ariaHidden = 'true';
@@ -154,6 +162,7 @@ for (const id of ['open-connection', 'open-settings']) element(id).addEventListe
     try { updatePreferences(await window.clipSync.preferences()); } catch { showError('설정을 읽을 수 없습니다.'); return; }
     element<HTMLSelectElement>('theme').value = preferences.theme;
     element<HTMLInputElement>('shortcut-setting').value = preferences.shortcut;
+    element<HTMLInputElement>('retain-history').checked = preferences.retainHistory;
     const startup = element<HTMLInputElement>('start-on-login');
     startup.checked = preferences.startOnLogin;
     startup.disabled = preferences.startupStatus === 'unsupported' || preferences.startupStatus === 'unavailable';
@@ -193,7 +202,7 @@ element('disconnect').addEventListener('click', () => { void act(async () => { c
 element('settings-form').addEventListener('submit', event => {
   event.preventDefault();
   void act(async () => {
-    const result = await window.clipSync.configure({ ...preferences, theme: element<HTMLSelectElement>('theme').value as Preferences['theme'], shortcut: element<HTMLInputElement>('shortcut-setting').value.trim(), startOnLogin: element<HTMLInputElement>('start-on-login').checked });
+    const result = await window.clipSync.configure({ ...preferences, theme: element<HTMLSelectElement>('theme').value as Preferences['theme'], shortcut: element<HTMLInputElement>('shortcut-setting').value.trim(), startOnLogin: element<HTMLInputElement>('start-on-login').checked, retainHistory: element<HTMLInputElement>('retain-history').checked });
     if (result.ok) {
       updatePreferences(await window.clipSync.preferences());
       settings.close();
@@ -214,7 +223,11 @@ element('history-list').addEventListener('click', dispatchAction);
 element('transfer-list').addEventListener('click', dispatchAction);
 function dispatchAction(event: MouseEvent) {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-action]');
-  if (!button?.dataset.id) return;
+  if (!button?.dataset.id) {
+    const card = (event.target as HTMLElement).closest<HTMLElement>('[data-history-id]');
+    if (card) { selectedHistoryId = card.dataset.historyId!; renderHistory(); }
+    return;
+  }
   const id = button.dataset.id;
   const actions: Record<string, () => Promise<Result>> = {
     accept: () => window.clipSync.acceptTransfer(id), cancel: () => window.clipSync.cancelTransfer(id), show: () => window.clipSync.showFile(id), image: () => window.clipSync.copyImage(id),

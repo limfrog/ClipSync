@@ -61,7 +61,9 @@
       <label for="shortcut-setting">창 열기·숨기기 단축키</label><input id="shortcut-setting" type="text" placeholder="CommandOrControl+Shift+V" maxlength="80" autocomplete="off" spellcheck="false" /><p class="small-note">Ctrl/Command, Alt, Shift와 영문자·숫자를 조합하세요.</p>
       <label class="checkbox-row"><input id="start-on-login" type="checkbox" aria-describedby="startup-note" /> 부팅 시 시작</label>
       <p id="startup-note" class="small-note">컴퓨터에 로그인하면 트레이·메뉴바에서 자동으로 시작합니다.</p>
-      <section class="section-card"><h3>클립보드 기록</h3><p>앱을 켜둔 동안 최대 100개를 보관합니다. 이미지는 미리보기로, 파일은 원본 참조로 관리합니다. 종료하면 기록은 사라지며, 동기화한 파일은 다운로드 폴더의 ClipSync에 남습니다. 창을 숨겨도 동기화는 계속됩니다.</p></section>
+      <label class="checkbox-row"><input id="retain-history" type="checkbox" aria-describedby="history-note" /> 종료 후에도 클립보드 기록 유지</label>
+      <p id="history-note" class="small-note">최대 100개의 기록을 이 PC에 보관합니다. 텍스트·파일 경로는 OS 보안 저장소로 암호화하며, 이미지는 앱 전용 폴더에 저장합니다. 파일은 원본이 있어야 다시 복사할 수 있습니다. 해제하면 저장된 기록을 지우고, 현재 기록은 앱 종료 시 사라집니다.</p>
+      <section class="section-card"><h3>창과 기록</h3><p>창 가장자리와 모서리를 드래그해 크기를 조절하세요. 크기와 위치는 다음 실행에도 유지됩니다. ×·Esc는 창을 숨기고 동기화를 계속합니다. 종료 버튼은 앱을 완전히 닫습니다.</p></section>
       <button class="button primary full" type="submit">설정 저장</button>
     </form>
     <div class="settings-build-bar"><span>ClipSync · 클립보드 매니저</span><span>텍스트 · 이미지 · 파일</span></div>

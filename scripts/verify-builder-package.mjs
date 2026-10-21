@@ -17,7 +17,7 @@ for (const folder of folders) {
   const roots = [...new Set(asar.listPackage(archive).map(file => file.split(/[\\/]/)[1]))].sort();
   assert.deepEqual(roots, ['THIRD_PARTY_NOTICES.txt', 'dist', 'node_modules', 'package.json'].sort(), 'Only app files and production dependencies belong in ASAR');
   assert.equal(JSON.parse(asar.extractFile(archive, 'package.json').toString()).version, version);
-  for (const name of ['icon.png', 'tray.png', 'tray@2x.png', 'trayTemplate.png', 'trayTemplate@2x.png']) {
+  for (const name of ['icon.png', 'icon-windows.png', 'tray-windows.ico', 'tray.png', 'tray@2x.png', 'trayTemplate.png', 'trayTemplate@2x.png']) {
     assert.deepEqual(asar.extractFile(archive, `dist/assets/${name}`), await readFile(`assets/${name}`));
   }
   if (kind === 'Windows') {

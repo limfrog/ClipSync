@@ -6,8 +6,10 @@ import type { SyncState } from '../shared/api';
 import type { TransferState } from '../shared/transfers';
 import { portableFilename } from './file-names';
 import type { SyncController } from './controller';
+import type { HistoryEntry } from './history';
 
 export interface MediaSnapshot { id: string; paths: string[]; image: boolean; size: number; fingerprint: string; thumbnail?: string }
+export interface SavedHistoryEntry extends HistoryEntry { media?: MediaSnapshot }
 export interface MediaClipboard {
   read(): Promise<MediaSnapshot | null>;
   write(snapshot: MediaSnapshot): Promise<void>;
@@ -190,6 +192,32 @@ export class MediaSync {
     this.controller.recordMedia({ id: snapshot.id, type: snapshot.image ? 'image' : 'file', preview: snapshot.image ? '클립보드 이미지' : `${path.basename(snapshot.paths[0]).normalize('NFC')}${snapshot.paths.length > 1 ? ` 외 ${snapshot.paths.length - 1}개` : ''}`, source, size: snapshot.size, thumbnail: snapshot.thumbnail });
     const retained = new Set(this.controller.state().history.map(item => item.id));
     for (const id of this.records.keys()) if (!retained.has(id)) this.records.delete(id);
+  }
+
+  historySnapshot(): SavedHistoryEntry[] {
+    return this.controller.historySnapshot().map(entry => {
+      let snapshot = this.records.get(entry.item.id);
+      if (!snapshot && entry.item.transfer?.direction === 'receive') try {
+        const file = this.controller.completedFile(entry.item.id);
+        snapshot = { id: entry.item.id, paths: [file.path], image: file.image, size: entry.item.transfer.size, fingerprint: `saved:${entry.item.id}` };
+      } catch { /* A legacy transfer without a retained file has no usable reference. */ }
+      return { ...entry, media: snapshot };
+    });
+  }
+
+  async restoreHistory(entries: SavedHistoryEntry[]) {
+    const restored: HistoryEntry[] = [];
+    for (const entry of entries) {
+      if (entry.media) {
+        // Refresh file metadata and previews without writing to the clipboard or
+        // publishing saved copies. Missing originals remain visible with an error on copy.
+        let snapshot = entry.media;
+        try { snapshot = { ...await this.io.describe(snapshot.paths, snapshot.image), id: entry.item.id }; } catch { /* Retain the original reference. */ }
+        this.records.set(entry.item.id, snapshot);
+        restored.push({ item: { ...entry.item, thumbnail: snapshot.thumbnail, size: snapshot.size } });
+      } else if (entry.item.type === 'text') restored.push(entry);
+    }
+    this.controller.restoreHistory(restored);
   }
 
   private async apply(snapshot: MediaSnapshot, expectedRevision?: number) {

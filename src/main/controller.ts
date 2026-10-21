@@ -5,7 +5,7 @@ import { hostSession, joinSession, type Session } from './session';
 import { TransferManager } from './transfers';
 import type { ClipboardBatch, Peer, TransferPacket } from '../shared/transfers';
 import type { HistoryItem } from '../shared/history';
-import { ClipboardHistory } from './history';
+import { ClipboardHistory, type HistoryEntry } from './history';
 import type { GroupCredentials } from '../shared/group';
 import { groupSession, type P2POptions, type P2PSession } from './group-session';
 
@@ -36,6 +36,9 @@ export class SyncController {
   }
 
   state(): SyncState { return { ...this.current, historyRevision: this.history.revision, history: this.history.state(), devices: this.current.devices.map(p => ({ ...p })), transfers: this.current.transfers.map(t => ({ ...t })) }; }
+
+  historySnapshot() { return this.history.snapshot(); }
+  restoreHistory(entries: HistoryEntry[]) { this.history.restore(entries); this.update({}); }
 
   private enqueue<T>(action: () => T | Promise<T>): Promise<T> {
     const next = this.clipboardQueue.then(action);

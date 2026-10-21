@@ -9,7 +9,13 @@ await mkdir('build/icons', { recursive: true });
 const scratch = await mkdtemp(path.join(tmpdir(), 'clipsync-icons-'));
 const convert = (...args) => execFileSync('magick', args, { stdio: 'inherit' });
 try {
-  convert('assets/icon.png', '-define', 'icon:auto-resize=256,128,64,48,32,24,16', 'build/icons/icon.ico');
+  // Size conversion: remove transparent padding for the small Windows system slots.
+  // Keep the original A artwork and colors; macOS keeps its existing padded app icon.
+  const box = execFileSync('magick', ['assets/icon.png', '-alpha', 'extract', '-threshold', '10%', '-format', '%@', 'info:'], { encoding: 'utf8' }).trim();
+  if (!/^\d+x\d+\+\d+\+\d+$/.test(box)) throw new Error('Invalid icon content bounds');
+  convert('assets/icon.png', '-crop', box, '+repage', '-resize', '960x960', '-gravity', 'center', '-background', 'none', '-extent', '1024x1024', 'assets/icon-windows.png');
+  convert('assets/icon-windows.png', '-define', 'icon:auto-resize=256,128,64,48,32,24,20,16', 'build/icons/icon.ico');
+  convert('assets/icon-windows.png', '-define', 'icon:auto-resize=64,48,32,24,20,16', 'assets/tray-windows.ico');
   const chunks = [];
   for (const [type, size] of [['icp4', 16], ['icp5', 32], ['icp6', 64], ['ic07', 128], ['ic08', 256], ['ic09', 512], ['ic10', 1024]]) {
     const file = path.join(scratch, `${size}.png`);

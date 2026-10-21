@@ -27,6 +27,10 @@ jobs:
         shell: bash
         run: bash scripts/check-ci.sh test
       - run: npm run build
+      - name: Verify native resize, history restore and focus behavior
+        if: runner.os != 'Linux'
+        shell: bash
+        run: bash scripts/check-ci.sh test:history
       - name: Verify Windows native titlebar regions and connection restore
         if: runner.os == 'Windows'
         run: node scripts/test-desktop.mjs tests/desktop.persistence.ts
@@ -61,6 +65,11 @@ jobs:
           CLIPSYNC_TEST_NO_SANDBOX: '1'
       - run: bash scripts/check-ci.sh test:persistence
         if: runner.os == 'Linux'
+        env:
+          CLIPSYNC_TEST_NO_SANDBOX: '1'
+      - name: Verify resized history manager with native keyring
+        if: runner.os == 'Linux'
+        run: dbus-run-session -- bash scripts/test-with-keyring.sh bash scripts/check-ci.sh test:history
         env:
           CLIPSYNC_TEST_NO_SANDBOX: '1'
       - run: npm run package

@@ -1,6 +1,6 @@
 {
   "name": "clipsync",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "복사 기록을 검색하고 재사용하며 텍스트·이미지·500MB 파일 클립보드를 기기 간 동기화하는 데스크톱 매니저",
   "private": true,
   "type": "module",
@@ -22,7 +22,8 @@
     "dist:win": "npm run build && electron-builder --config electron-builder.config.cjs --win nsis --x64 --publish never",
     "dist:mac": "npm run build && electron-builder --config electron-builder.config.cjs --mac pkg --arm64 --x64 --publish never",
     "dist:mac:cross": "npm run build && node scripts/build-mac-apps.mjs && python3 scripts/build-macos-pkg.py",
-    "test:persistence": "dbus-run-session -- bash scripts/test-with-keyring.sh node scripts/test-desktop.mjs tests/desktop.persistence.ts"
+    "test:persistence": "dbus-run-session -- bash scripts/test-with-keyring.sh node scripts/test-desktop.mjs tests/desktop.persistence.ts",
+    "test:history": "node scripts/test-desktop.mjs tests/desktop.history.ts"
   },
   "dependencies": {
     "hyperdht": "6.34.1",

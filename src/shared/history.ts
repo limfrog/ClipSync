@@ -17,11 +17,12 @@ export interface Preferences {
   theme: 'system' | 'dark' | 'light';
   alwaysOnTop: boolean;
   startOnLogin: boolean;
+  retainHistory: boolean;
   startupStatus?: 'unsupported' | 'unavailable' | 'disabled' | 'enabled' | 'requires-approval' | 'blocked';
   shortcut: string;
   shortcutAvailable?: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  theme: 'system', alwaysOnTop: false, startOnLogin: false, shortcut: 'CommandOrControl+Shift+V',
+  theme: 'system', alwaysOnTop: false, startOnLogin: false, retainHistory: false, shortcut: 'CommandOrControl+Shift+V',
 };

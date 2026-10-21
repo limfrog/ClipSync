@@ -62,7 +62,7 @@ test('native dragging, secure connection restore, hide keeps syncing, quit exits
     const storage = await app.evaluate(({ safeStorage, app }) => ({ available: safeStorage.isEncryptionAvailable(), backend: process.platform === 'linux' ? safeStorage.getSelectedStorageBackend() : 'native', requested: app.commandLine.getSwitchValue('password-store') }));
     assert.equal(storage.available, true, `Native secret store: ${JSON.stringify(storage)}`); assert.notEqual(storage.backend, 'basic_text');
     await page.evaluate(async () => { const p = await window.clipSync.preferences(); await window.clipSync.configure({ ...p, alwaysOnTop: true }); });
-    // Window-manager/keyring startup can blur and hide the tray window before the first click.
+    // Bring the native window forward after the keyring has initialized.
     await app.evaluate(({ app }) => app.emit('activate'));
     return { app, page };
   }
@@ -106,8 +106,8 @@ test('native dragging, secure connection restore, hide keeps syncing, quit exits
     assert.ok(settings && hide && devices);
     await windowsHeaderHitTest(first.app, [
       { x: 130, y: 22, expected: 2 },
-      { x: 130, y: 6, expected: 2 },
-      { x: 330, y: 6, expected: 2 },
+      { x: 130, y: 12, expected: 2 },
+      { x: 330, y: 12, expected: 2 },
       ...[settings, hide, devices].map(box => ({ x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2), expected: 1 })),
     ]);
   }
