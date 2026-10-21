@@ -8,7 +8,7 @@ export function restoreWindowBounds(value: unknown, areas: WorkArea[], primary: 
   const positioned = Number.isInteger(saved.x) && Number.isInteger(saved.y);
   const area = positioned ? areas.find(r => saved.x! >= r.x && saved.x! < r.x + r.width && saved.y! >= r.y && saved.y! < r.y + r.height) ?? primary : primary;
   const width = Math.max(MIN_WINDOW_WIDTH, Math.min(Number.isInteger(saved.width) ? saved.width! : 400, area.width));
-  const height = Math.max(MIN_WINDOW_HEIGHT, Math.min(Number.isInteger(saved.height) ? saved.height! : 760, area.height - 30));
+  const height = Math.max(MIN_WINDOW_HEIGHT, Math.min(Number.isInteger(saved.height) ? saved.height! : Math.min(760, area.height - 30), area.height));
   if (!positioned || !areas.includes(area) || !areas.some(r => saved.x! >= r.x && saved.x! < r.x + r.width && saved.y! >= r.y && saved.y! < r.y + r.height)) return { width, height };
   return { width, height, x: Math.max(area.x, Math.min(saved.x!, area.x + area.width - width)), y: Math.max(area.y, Math.min(saved.y!, area.y + area.height - height)) };
 }

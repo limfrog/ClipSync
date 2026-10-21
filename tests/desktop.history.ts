@@ -95,7 +95,10 @@ test('resizable manager retains encrypted text, images, file references and pins
     await delay(250);
     assert.equal(await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible()), true);
   }
-  await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setBounds({ x: 40, y: 35, width: 640, height: 700 }));
+  await app!.evaluate(({ BrowserWindow, screen }) => {
+    const area = screen.getPrimaryDisplay().workArea;
+    BrowserWindow.getAllWindows()[0].setBounds({ x: area.x + 40, y: area.y + 35, width: 640, height: 600 });
+  });
   await delay(250);
   const bounds = await app!.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getNormalBounds());
   await quit();
