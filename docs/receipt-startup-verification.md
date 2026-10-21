@@ -31,4 +31,29 @@
 
 Windows에서는 사용자 Run 키의 `ClipSync` 항목과 승인 상태를 확인합니다. Electron의 `openAtLogin`은 기본 AppUserModelID만 조회하므로 사용자 지정 이름에는 `launchItems`를 확인합니다. 경로에 공백·한글이 있어도 정상적으로 조회·실행되도록 따옴표를 처리합니다. 제거 프로그램도 이 앱의 자동 시작 항목을 삭제합니다.
 
-CI는 Windows의 실제 패키지와 `/Applications/ClipSync.app`에 설치한 Intel Mac 패키지에서 체크·실제 OS 등록 조회·재실행·숨김 시작·중복 실행 방지·등록 해제를 검사하도록 구성했습니다. OS별 최종 결과와 배포 다운로드 검증은 완료 후 아래에 기록합니다. 운영체제 재부팅·로그아웃/로그인 자체를 수행하는 검사는 아닙니다. Windows API의 인수 목록은 `--startup` 같은 스위치를 제외하므로, 실제 Run 레지스트리 값도 별도로 읽어 시작 인수가 포함됐는지 검사합니다.
+CI는 Windows의 실제 패키지와 `/Applications/ClipSync.app`에 설치한 Intel Mac 패키지에서 체크·실제 OS 등록 조회·재실행·숨김 시작·중복 실행 방지·등록 해제를 검사합니다. 운영체제 재부팅·로그아웃/로그인 자체를 수행하는 검사는 아닙니다. Windows API의 인수 목록은 `--startup` 같은 스위치를 제외하므로, 실제 Run 레지스트리 값도 별도로 읽어 시작 인수가 포함됐는지 검사합니다.
+
+## 최종 CI 결과
+
+제품 커밋 `419f2ef`와 태그 `v0.4.6`의 [CI 실행 #30](https://github.com/limfrog/ClipSync/actions/runs/39523305527)은 2026-10-21 (Asia/Seoul)에 4개 환경 모두 성공했습니다. 각 환경에서 단위·소켓 검사 50개와 타입 검사·빌드를 실행했습니다.
+
+| 환경 | 추가 실제 앱 검사 | 결과 |
+| --- | --- | --- |
+| [Windows x64](https://github.com/limfrog/ClipSync/actions/runs/39523305527/job/118972037551) | 네이티브 창 상단 드래그 영역, 연결 복원, 한글·공백 경로에서 자동 시작 등록·레지스트리 조회·숨김 실행·중복 실행 방지·해제 | 성공 |
+| [Mac Intel](https://github.com/limfrog/ClipSync/actions/runs/39523305527/job/118972038019) | `/Applications`에 배치한 패키지의 로그인 항목 등록·조회·숨김 실행·Dock 숨김·중복 실행 방지·해제 | 성공 |
+| [Mac Apple Silicon](https://github.com/limfrog/ClipSync/actions/runs/39523305527/job/118972037557) | 단위·소켓·타입·빌드 검사 | 성공 |
+| [Linux x64](https://github.com/limfrog/ClipSync/actions/runs/39523305527/job/118972037271) | 두 테마 대비, 실제 포인터 이동, 보안 저장·재실행 복원, 독립 클립보드 앱 두 개의 한글·이미지·500MB 전송과 중복 재사용, 별도 500MB 소켓 검사 | 성공 |
+
+이 최종 커밋을 클라우드에서도 다시 패키징해 데스크톱 통합 항목 12개(상위 항목 포함 13개)를 통과했습니다. 500MB 전송·해시 일치 확인 후 텍스트를 거쳐 같은 파일을 다시 복사했을 때 양쪽 전송량 0바이트, 기존 파일 경로 재사용, 수신 폴더 파일 목록 불변을 확인했습니다.
+
+## 설치 파일과 공개 다운로드
+
+[배포 실행 #12](https://github.com/limfrog/ClipSync/actions/runs/39523543801)는 같은 제품 커밋에서 성공했습니다. Windows 앱·설치 파일의 아이콘과 패키지 내용, Mac 두 아키텍처의 패키지 내용·아이콘·`codesign --verify --deep --strict`·PKG 확장을 검사했습니다. 아래 [공개 릴리스](https://github.com/limfrog/ClipSync/releases/tag/v0.4.6)의 고정 HTTPS 주소에서 세 파일을 다시 내려받아 `SHA256SUMS.txt`와 대조했습니다. Windows 파일은 7-Zip의 NSIS 무결성 검사도 통과했습니다.
+
+| 파일 | 바이트 | SHA-256 |
+| --- | ---: | --- |
+| [Windows x64](https://github.com/limfrog/ClipSync/releases/download/v0.4.6/ClipSync-0.4.6-Windows-x64-Setup.exe) | 116,573,781 | `e156f0b3782ee251ff0342db46f97a1a88f1bf701555e8c7349116bb455d7025` |
+| [Mac Apple Silicon](https://github.com/limfrog/ClipSync/releases/download/v0.4.6/ClipSync-0.4.6-macOS-arm64.pkg) | 129,337,928 | `781459c5c926757f5a1fab6a22dfd6d68a83df53c048ab2b2832e74e3d6a0c4f` |
+| [Mac Intel](https://github.com/limfrog/ClipSync/releases/download/v0.4.6/ClipSync-0.4.6-macOS-x64.pkg) | 136,277,595 | `dacdc74445730102dc9a780b69b0dca5edfa70fe9c31bfad9e807be8f60d1eec` |
+
+설치 전 양쪽 앱을 **종료**하고 업데이트하세요. 기존 키·비밀번호와 설정은 유지합니다. 파일 데이터 전송을 생략하는 중복 판정은 양쪽 앱이 0.4.6일 때 적용됩니다. 부팅 시 시작은 업데이트 후 환경설정에서 직접 켜며, Mac에서 로그인 항목 승인이 필요한 경우 표시되는 시스템 설정 안내를 따릅니다.

@@ -1,14 +1,14 @@
 # ClipSync 설치 프로그램
 
-현재 버전은 창 상단 여백 드래그 수정과 투명 배경 A 아이콘을 포함한 0.4.5입니다. Mac 메뉴바는 배경에 따라 흰색·검은색으로 표시되는 전용 템플릿 아이콘을 사용합니다. [릴리스](https://github.com/limfrog/ClipSync/releases/tag/v0.4.5) · [0.4.5 검증 기록](window-drag-verification.md) · [0.4.4 발견 검증 기록](broadcast-discovery-verification.md) · [Mac–Windows 실물 검증 절차](physical-verification.md).
+현재 버전은 중복 파일 재사용·화면 가독성 개선·부팅 시 시작 설정을 포함한 0.4.6입니다. 동일 파일의 데이터 재전송 생략은 양쪽 앱을 업데이트하면 사용할 수 있습니다. Mac 메뉴바는 배경에 따라 흰색·검은색으로 표시되는 전용 템플릿 아이콘을 사용합니다. [릴리스](https://github.com/limfrog/ClipSync/releases/tag/v0.4.6) · [0.4.6 검증 기록](receipt-startup-verification.md) · [0.4.5 창·아이콘 검증 기록](window-drag-verification.md) · [0.4.4 발견 검증 기록](broadcast-discovery-verification.md) · [Mac–Windows 실물 검증 절차](physical-verification.md).
 
 | 대상 | 파일 | 설치 위치 |
 | --- | --- | --- |
-| Windows x64 | [ClipSync-0.4.5-Windows-x64-Setup.exe](https://github.com/limfrog/ClipSync/releases/download/v0.4.5/ClipSync-0.4.5-Windows-x64-Setup.exe) | `%LOCALAPPDATA%\Programs\ClipSync` |
-| macOS Apple Silicon | [ClipSync-0.4.5-macOS-arm64.pkg](https://github.com/limfrog/ClipSync/releases/download/v0.4.5/ClipSync-0.4.5-macOS-arm64.pkg) | `/Applications/ClipSync.app` |
-| macOS Intel | [ClipSync-0.4.5-macOS-x64.pkg](https://github.com/limfrog/ClipSync/releases/download/v0.4.5/ClipSync-0.4.5-macOS-x64.pkg) | `/Applications/ClipSync.app` |
+| Windows x64 | [ClipSync-0.4.6-Windows-x64-Setup.exe](https://github.com/limfrog/ClipSync/releases/download/v0.4.6/ClipSync-0.4.6-Windows-x64-Setup.exe) | `%LOCALAPPDATA%\Programs\ClipSync` |
+| macOS Apple Silicon | [ClipSync-0.4.6-macOS-arm64.pkg](https://github.com/limfrog/ClipSync/releases/download/v0.4.6/ClipSync-0.4.6-macOS-arm64.pkg) | `/Applications/ClipSync.app` |
+| macOS Intel | [ClipSync-0.4.6-macOS-x64.pkg](https://github.com/limfrog/ClipSync/releases/download/v0.4.6/ClipSync-0.4.6-macOS-x64.pkg) | `/Applications/ClipSync.app` |
 
-SHA-256は [SHA256SUMS.txt](https://github.com/limfrog/ClipSync/releases/download/v0.4.5/SHA256SUMS.txt)에서 확인할 수 있습니다.
+SHA-256은 [SHA256SUMS.txt](https://github.com/limfrog/ClipSync/releases/download/v0.4.6/SHA256SUMS.txt)에서 확인할 수 있습니다.
 
 각 파일은 500,000,000바이트보다 작습니다. Windows 설치 화면은 한국어·영어를 지원하며 시작 메뉴·바탕화면 바로가기와 제거 프로그램을 포함합니다. Mac은 자기 CPU에 맞는 PKG를 선택해야 합니다. PKG 설치에는 관리자 권한이 필요합니다. 프로그램을 종료한 뒤 설치하세요.
 
@@ -16,7 +16,7 @@ SHA-256は [SHA256SUMS.txt](https://github.com/limfrog/ClipSync/releases/downloa
 
 ## 현재 검증과 과거 기록
 
-현재 릴리스 워크플로는 실제 패키지의 앱 버전·파일 구성·선택한 아이콘을 검사합니다. Windows는 실행 파일과 설치 프로그램의 아이콘 리소스를 모두 비교하고, Mac은 두 앱 번들의 ICNS와 `codesign --verify --deep --strict`, PKG 확장을 검사합니다. 배포 파일을 공개 HTTPS 주소에서 다시 받아 SHA-256을 대조합니다. 0.4.5에서 운영체제의 실제 설치 화면·Mac 메뉴바 색 전환을 클라우드에서 실행해 확인한 것은 아닙니다.
+현재 릴리스 워크플로는 실제 패키지의 앱 버전·파일 구성·선택한 아이콘을 검사합니다. Windows는 실행 파일과 설치 프로그램의 아이콘 리소스를 모두 비교하고, Mac은 두 앱 번들의 ICNS와 `codesign --verify --deep --strict`, PKG 확장을 검사합니다. 배포 파일을 공개 HTTPS 주소에서 다시 받아 SHA-256을 대조합니다. Windows·Mac 패키지의 실제 자동 시작 등록·조회·해제와 숨김 실행을 확인합니다. 운영체제 재부팅 자체나 실제 설치 화면·Mac 메뉴바 색 전환을 클라우드에서 실행해 확인하는 검사는 아닙니다.
 
 사용자는 0.4.4에서 Mac–Windows 연결·텍스트·이미지·한글·300MB 파일, 자동 재연결과 외부 네트워크 연결 성공을 확인했습니다. 아래 내용은 **초기 0.2.0 빌드의 검증 기록**입니다.
 
